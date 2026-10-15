@@ -2,7 +2,7 @@
 
 ## Project status
 
-Prismatic Launcher is an infrastructure-only C++20/Qt 6.8 desktop project foundation. `infrastructure_plan.md` is the approved decision record; the files in this repository implement its tooling, Docker validation, CI, and documentation, not product behavior.
+Prismatic Launcher is a local C++20/Qt 6 Widgets desktop mod launcher. The user's autonomous product implementation mission extends the original infrastructure-only foundation. Read `infrastructure_plan.md`, `docs/decisions/001-local-mod-profiles.md`, and `PROGRESS.md` for current decisions, limitations, and verification. The historical infrastructure plan is in `prismatic-launcher/documents/infrastructure_plan.md`.
 
 ## Repository map
 
@@ -13,8 +13,12 @@ Prismatic Launcher is an infrastructure-only C++20/Qt 6.8 desktop project founda
 - `Dockerfile.ci`, `.dockerignore` — Linux validation infrastructure only.
 - `.github/workflows/pr-checks.yml`, `.github/workflows/release.yml` — CI and guarded release workflows.
 - `README.md`, `infrastructure_plan.md` — developer documentation and approved plan.
+- `PROGRESS.md`, `docs/decisions/` — resumable status and implementation decisions.
+- `src/core/` — explicit core modules for atomic files, instances, game launching, and mods.
+- `prismatic-launcher/src/qt/` — canonical Qt UI and application entry point.
+- `tests/core/`, `tests/ui/` — fixture-based core and offscreen widget tests.
 - `.agents/skills/` — local skill instructions.
-- `src/`, `packaging/`, backend/API directories — not created yet.
+- `packaging/`, backend/API directories — not implemented. Historical alternate entry points and old SMAPI utilities remain unbuilt reference sources.
 
 ## Required reading and skill selection
 
@@ -22,8 +26,9 @@ Read `infrastructure_plan.md`, this file, and the relevant `.agents/skills/*/SKI
 
 ## Boundaries
 
-- Do not add product UI, game discovery, mod-management behavior, domain schema, or release packaging while doing infrastructure-only work.
-- Do not change the selected C++20, Qt 6, vcpkg, SQLite, Docker, or GitHub Release decisions without revising `infrastructure_plan.md` through `infra-planner`.
+- Preserve the instance isolation contract: game files and saves are shared, profile mods are separate. Never swap or overwrite the game's existing Mods directory.
+- Keep development writes inside this experimental worktree, use disposable fixtures, and never execute game/mod binaries in tests. Do not contact GitHub, push, publish, or alter Git remotes.
+- Preserve C++20, Qt 6, vcpkg and the documented infrastructure. JSON is the experimental persistence implementation; SQLite is a historical plan, not a shipped feature. Record architectural changes in decisions and progress documentation.
 - Do not commit secrets, signing certificates, generated build output, coverage reports, vcpkg installations, or local game/mod data.
 - Docker validates Linux only; it does not replace native Windows/macOS packaging, signing, or macOS notarization.
 

@@ -1,116 +1,77 @@
 # Prismatic Launcher
 
-Prismatic Launcher is a C++20/Qt 6 desktop launcher for Stardew Valley. Its initial Qt Widgets UI follows `image.png`: an instance library with Add/Play/Edit and a detail view with Mods, Logs, Settings, and Modpacks. Automatic game discovery, mod installation, SQLite data access, and release packaging are not connected yet.
+A local C++20 / Qt 6 Widgets launcher for Stardew Valley with persistent mod profiles. The Library, Mods, Logs, Settings, and Modpacks pages use real filesystem services. Development is confined to this experimental worktree; no remote publication or real game-data changes are part of validation.
 
-## Repository map
+## Build and run
 
-- `CMakeLists.txt`, `CMakePresets.json` — C++20 build and CTest harness configuration.
-- `vcpkg.json`, `vcpkg-configuration.json` — Qt dependency manifest and immutable vcpkg baseline.
-- `scripts/` — Linux CI, quality, and infrastructure-smoke scripts.
-- `tests/ui/` — offscreen Qt Test coverage for config, search, navigation, and launch errors.
-- `prismatic-launcher/src/qt/` — launcher UI, stylesheet, entrypoint, and embedded default config.
-- `Dockerfile.ci` — non-root Ubuntu Linux build/test image; it is not a production image.
-- `.github/workflows/` — pull-request validation and guarded release workflow definitions.
-- `prismatic-launcher/documents/infrastructure_plan.md` — approved infrastructure decisions.
-- `.agents/skills/` — repository-specific agent skills.
-- `prismatic-launcher/src/` — product source belongs here.
-- `packaging/` — not created yet; future product-owned portable-archive packaging belongs here.
-
-## Getting Started
-
-### 1. Install host prerequisites
-
-Install the following on every development workstation:
-
-1. [Git](https://git-scm.com/downloads), a supported stable release.
-2. [CMake](https://cmake.org/download/) 3.28 or newer.
-3. [Ninja](https://ninja-build.org/) and a C++20-capable native compiler: MSVC Build Tools on Windows, Xcode Command Line Tools on macOS, or GCC/Clang on Linux.
-4. [Qt 6.8 LTS](https://www.qt.io/download-qt-installer) for native UI development.
-5. [vcpkg](https://github.com/microsoft/vcpkg), bootstrapped locally. The repository pins its dependency registry baseline in `vcpkg-configuration.json`.
-6. [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker Engine if you will run the repeatable Linux validation environment.
-
-Native release maintainers also need their platform packaging tools. macOS distribution requires an Apple Developer account, signing certificate, and notarization credentials. Windows signing requires a code-signing certificate if the project elects to sign Windows archives.
-
-### 2. Configure the native toolchain
-
-With Qt available on CMake's search path, configure, build, test, and run:
+Requirements: CMake 3.28+, Ninja or another CMake generator, a C++20 compiler, Qt 6.4+ development packages (Core, Widgets, Concurrent, Test), and the **official libarchive development package**. Qt 6.8 is the preferred SDK; Linux is tested with Qt 6.4.2. On Ubuntu the relevant native packages include `qt6-base-dev`, `libarchive-dev`, `ninja-build`, and `g++`. The vcpkg manifest declares Qt and libarchive for toolchain-based builds.
 
 ```bash
 cmake --preset dev
-cmake --build --preset dev
+cmake --build --preset dev --parallel 2
 ctest --preset dev --output-on-failure
-./build/dev/bin/prismatic-launch
+./build/dev/bin/prismatic-launch --data-dir "$PWD/data"
 ```
 
-For an SDK installed outside system paths, pass `-DCMAKE_PREFIX_PATH=/path/to/Qt/6.8.3/gcc_64` to the configure command (use your platform's actual SDK directory). To resolve Qt through the pinned vcpkg manifest instead, pass `-DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"`. CMake links Qt Widgets and Qt Test using the [Qt CMake integration](https://doc.qt.io/qt-6/cmake-get-started.html).
+If Qt is outside system paths, configure with `-DCMAKE_PREFIX_PATH=/path/to/Qt/SDK`. For an existing vcpkg setup, use its CMake toolchain file. No dependency downloads or system installations are performed by these instructions automatically. Windows produces `bin/prismatic-launch.exe`; macOS produces `bin/prismatic-launch.app`. Both require native Qt/runtime deployment and are not validated on this Linux host.
 
-On Ubuntu with `qt6-base-dev`, CMake 3.28+, a C++ compiler, and Make installed, Ninja is optional with this alternate build:
+The default data directory is `data` beside the executable. Select a writable location with `--data-dir` or `PRISMATIC_DATA_DIR`. Use `--config /absolute/path/launcher.ini` to read an existing bootstrap configuration; otherwise the INI lives inside the data directory. `--help` lists options. Only one application may open a given data directory at a time.
+
+## Workflows
+
+- **Library:** create, rename, search, select, duplicate, and delete instances. Names, game paths, launch modes, arguments, and selection persist. Deletion asks for confirmation and retains profile files in recovery trash. Duplicate copies enabled and disabled mods and their configuration on a worker thread.
+- **Settings:** choose an existing game directory manually or find conventional Steam installations, including additional libraries described by Steam metadata. Select vanilla or already-installed SMAPI. Enter one extra argument per line; a line containing spaces remains one argument. Play revalidates the executable and launches it with the correct working directory without a shell command string.
+- **Mods:** install a local ZIP or folder, including a collection containing several nested mods. Each mod needs a valid `manifest.json`; name, author, version, and unique ID are displayed. Disable/enable moves the entire mod directory and preserves configuration. Removal requires confirmation and retains the directory under `RemovedMods`.
+- **Modpacks:** import a ZIP containing multiple mods, or duplicate a configured profile as another collection. There is no online catalog or portable collection export.
+- **Logs:** view/filter bounded session activity and captured game/SMAPI stdout/stderr. Export a diagnostic text file. Configured game, launcher-data, and home paths are redacted; review the contents before sharing because game output can contain other personal details. Logs are session-only unless exported.
+
+Long profile/mod filesystem operations run off the GUI thread with progress and errors. Profile mutation and application closing are blocked during operations and while a launched game is running. Close the game normally before closing the launcher.
+
+## What an instance isolates
+
+An instance is a **mod profile**, not a second game installation. Game files and saves are shared. Every profile has its own `Mods` and `DisabledMods` directories. A modded launch passes its absolute Mods directory to SMAPI using `--mods-path`; the launcher's installation and profile operations never swap or overwrite the existing game's Mods folder. Vanilla ignores profile mods.
+
+SMAPI must already be installed separately. Mods bundled into the game's original Mods directory are not automatically copied; install the mods and dependencies required by each profile. There is no dependency solver, automatic updater, SMAPI installer, or save isolation. Real game execution has deliberately not been exercised during development.
+
+## Storage and recovery
+
+The portable data directory contains:
+
+```text
+launcher.ini                         # optional bootstrap game/directory string
+instances.json                       # versioned instance registry
+instances.json.bak                   # previous valid registry
+instances.recovery-<hash>.json        # retained malformed registry, when recovered
+.launcher-session.lock               # application lifetime lock
+profiles/<UUID>/Mods/
+profiles/<UUID>/DisabledMods/
+profiles/<UUID>/RemovedMods/<UUID>/   # recoverable explicitly removed mods
+profiles/<UUID>.mods.lock             # shared profile-operation lock
+trash/<UUID>-<UUID>/                  # recoverable explicitly deleted profiles
+```
+
+INI migration seeds the initial profile; subsequent instances keep independent settings. Unknown INI settings and comments are preserved when updating the bootstrap path. JSON is the current experimental metadata store; the historical SQLite plan is not implemented. See [the decision record](docs/decisions/001-local-mod-profiles.md) and [current infrastructure addendum](infrastructure_plan.md).
+
+Registry writes use atomic replacement, backups, schema validation, stale-write detection, and recovery snapshots for malformed input. Errors preserve existing records and user files. Recovery/trash directories are not automatically purged. To recover a deleted profile, close the launcher and copy its retained mod directories into a newly created profile, or restore a consistent registry/profile backup. Do not edit registry files while the application is running.
+
+ZIP handling uses official libarchive APIs and requires the central directory. It rejects path traversal, absolute/drive/UNC names, symlinks, hard links, special files, encrypted entries, filename aliases, duplicate paths, and conflicting mod IDs/versions. Limits are 10,000 archive entries, 256 MiB per file, 1 GiB expanded content, and bounded nesting. Installation stages files and rolls back ordinary commit failures; incomplete rollback retains staging with a recovery diagnostic. A mod containing another mod's manifest is rejected as ambiguous. Existing mod versions are never overwritten automatically, including disabled versions. To replace one, duplicate the profile for backup, explicitly remove the old version, then install its replacement.
+
+These safeguards assume a private launcher data directory and cooperating processes. Installation does not execute archive contents. Multi-directory commits have no crash journal; atomic rename is not a guarantee against every power-loss failure. Keep backups of valuable configuration.
+
+## Validation and source map
 
 ```bash
-cmake -S . -B build/local -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build/local -j
-ctest --test-dir build/local --output-on-failure
-./build/local/bin/prismatic-launch
-```
-
-Windows builds produce `prismatic-launch.exe` in the build's `bin` directory; macOS builds produce `bin/prismatic-launch.app`. Development executables still require the Qt runtime.
-
-### Game path and UI scope
-
-`prismatic-launcher/src/qt/config/defaults.ini` supplies `~/.local/share/Steam/steamapps/common/Stardew Valley`, the conventional Ubuntu Steam location. The launcher expands `~` for the current user and performs no automatic path discovery. Other Steam libraries, Snap/Flatpak Steam, and other OS installations require an explicit path in Settings.
-
-Settings → Save game path writes a per-user INI override using [Qt's settings API](https://doc.qt.io/qt-6/qsettings.html). On Ubuntu the default is `~/.config/Prismatic/Prismatic Launcher/launcher.ini` (or under `XDG_CONFIG_HOME` when set). The UI shows the exact path. Use `--config /absolute/path/launcher.ini` for an alternate configuration file:
-
-```ini
-[game]
-directory=/home/your-user/.local/share/Steam/steamapps/common/Stardew Valley
-```
-
-Play validates and starts the selected game's executable from that folder. Vanilla uses `StardewValley` on Ubuntu; Modded uses an already-installed `StardewModdingAPI`. Add Instance creates session-only UI entries sharing that game path. Modes and entries reset on restart; the game path persists. Mods and Modpacks show empty preview pages; mod-management actions are disabled. Logs shows launcher activity for the current session, with text search, rather than game output. No game files are copied, installed, or modified. SQLite remains the planned future structured persistence layer; this INI is only the bootstrap path configuration.
-
-No `.env` file or local service is needed. Do not add secrets, certificates, or game data to the repository.
-
-### 3. Validate infrastructure in Docker
-
-Build and run the Linux validation image:
-
-```bash
-docker build --pull=false -f Dockerfile.ci -t prismaticlauncher-ci:local .
-docker run --rm prismaticlauncher-ci:local
-docker run --rm --entrypoint bash prismaticlauncher-ci:local -lc ./scripts/verify-infrastructure.sh
-```
-
-The image is disposable and exposes no ports or volumes. Remove the local image when no longer needed with `docker image rm prismaticlauncher-ci:local`.
-
-### 4. Quality checks
-
-```bash
+./scripts/verify-infrastructure.sh
 ./scripts/format-check.sh
 ./scripts/static-analysis.sh
-./scripts/verify-infrastructure.sh
 ```
 
-Formatting and analysis include `prismatic-launcher/src/qt` and `tests`. Static analysis needs a configured and built compilation database; set `PRISMATIC_BUILD_DIR=build/local` for an alternate build directory. Linux CI uses the coverage build when the dev build is unavailable; a fresh standalone analysis run configures and builds the dev preset automatically. The 60% coverage floor applies to tested core configuration logic (`LauncherConfig.cpp`); UI presentation and tests are outside this initial core threshold.
+Static analysis uses compiled repository translation units from `compile_commands.json`; it includes core, UI, and tests. Set `PRISMATIC_BUILD_DIR=build/final` for another build directory. Coverage uses the coverage preset and gcovr, retaining the 60% core/config floor; gcovr must be installed separately. Docker is Linux validation infrastructure only. Its existing dependency bootstrap contacts GitHub, so Docker builds were not executed under this task's no-remote-access restriction.
 
-To capture offscreen screenshots alongside the UI test run:
+- `src/core/`: atomic file handling, instance persistence, game discovery/launching, and mod services.
+- `prismatic-launcher/src/qt/`: UI, styling, bootstrap configuration, and canonical entry point.
+- `tests/core/`, `tests/ui/`: disposable fixture tests, adversarial archives, trusted process helper, and offscreen widget workflows. CTest redirects home/temp/data locations into the build tree.
+- CMake explicitly lists target sources. Historical `MainWindow` and SMAPI utility files remain unbuilt reference code; there is one canonical executable.
+- [PROGRESS.md](PROGRESS.md) records agent ownership, exact validation results, and remaining tasks/limitations.
 
-```bash
-PRISMATIC_SCREENSHOTS=/tmp/prismatic-preview QT_QPA_PLATFORM=offscreen ./build/dev/launcher-ui-tests
-```
-
-## CI and releases
-
-Pull requests run Linux Docker validation, infrastructure checks, formatting, static analysis, Gitleaks, and CodeQL. Windows and macOS runners install Qt 6.8.3, build the launcher, and run the offscreen Qt tests.
-=======
-Pull requests run Linux Docker validation, infrastructure checks, formatting, static-analysis configuration, Gitleaks, and CodeQL. Before configuring and building the CMake harness, the Windows and macOS runners install Qt 6.8.3; Windows then activates its MSVC 2022 x64 build environment to match the Qt kit. Product targets will extend those validations.
-
-Tags matching `v*` start the guarded GitHub Release workflow. It intentionally fails before publishing until product-owned `packaging/` scripts exist and the protected `release` environment contains the required Apple notarization configuration. Future releases will publish portable archives: Windows ZIP, macOS ZIP, and Linux `tar.gz`, along with SHA-256 checksums.
-
-Required GitHub configuration: create a protected `release` environment; configure `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` for macOS signing/notarization. If Windows signing is adopted, also configure `WINDOWS_CODESIGN_CERTIFICATE` and `WINDOWS_CODESIGN_PASSWORD` and update the product packaging implementation.
-
-## Troubleshooting
-
-- **`cmake --preset dev` cannot find Ninja:** install Ninja and ensure it is on `PATH`, or use a future platform-specific preset.
-- **Docker cannot connect to the daemon:** start Docker Desktop or the Docker Engine service, then rerun the two Docker commands above.
-- **Qt is not found after product targets are added:** install Qt 6.8 LTS and configure CMake with the appropriate `Qt6_DIR`, or use the vcpkg toolchain chosen by the product implementation.
-- **A release workflow stops at prerequisites:** this is expected until `packaging/` and the protected release environment are deliberately configured; it does not publish partial releases.
+Native packaging/signing, Windows/macOS execution, and actual game/SMAPI compatibility still require platform-specific validation. This worktree is an integrated experiment, not a signed production release.

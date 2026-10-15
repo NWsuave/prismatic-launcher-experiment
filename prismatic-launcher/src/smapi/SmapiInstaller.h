@@ -6,9 +6,9 @@
 #include <optional>
 
 /*
-* InstallStatus
-* provides enums for status of the installation process
-*/
+ * InstallStatus
+ * provides enums for status of the installation process
+ */
 enum class InstallStatus {
     Success,
     InvalidGameDirectory,
@@ -19,9 +19,9 @@ enum class InstallStatus {
 };
 
 /*
-* InstallResult
-* keeps track of the isntallation result
-*/
+ * InstallResult
+ * keeps track of the isntallation result
+ */
 struct InstallResult {
     InstallStatus status;
     QString message;
@@ -30,22 +30,21 @@ struct InstallResult {
     QString standardError;
 
     /*
-    * Compares the status of the installation to success
-    * @return if the installation succeeded
-    */
-    [[nodiscard]] bool succeeded() const {
-        return status == InstallStatus::Success;
-    }
+     * Compares the status of the installation to success
+     * @return if the installation succeeded
+     */
+    [[nodiscard]] bool succeeded() const { return status == InstallStatus::Success; }
 };
 
 /*
-* SmapiInstaller
-* handles SMAPI installation process and verifying installation
-*/
+ * SmapiInstaller
+ * handles SMAPI installation process and verifying installation
+ */
 class SmapiInstaller {
-    public:
+   public:
     [[nodiscard]] bool isInstalled(const QString& gameDirectory) const;
-    [[nodiscard]] InstallResult install(const QString& gameDirectory, const QString& installerPath) const;
+    [[nodiscard]] InstallResult install(const QString& gameDirectory,
+                                        const QString& installerPath) const;
 };
 
 #endif

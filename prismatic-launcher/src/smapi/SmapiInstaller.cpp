@@ -3,10 +3,9 @@
 
 #include <QDir>
 #include <QFileInfo>
-#include <optional>
-#include <QStringList>
 #include <QProcess>
-
+#include <QStringList>
+#include <optional>
 
 struct InstallerCommand {
     QString program;
@@ -19,7 +18,8 @@ struct InstallerCommand {
  * @param error message
  * @return the installer command
  */
-std::optional<InstallerCommand> resolveInstallerCommand(const QString& installerDirectory, QString* errorMessage) {
+std::optional<InstallerCommand> resolveInstallerCommand(const QString& installerDirectory,
+                                                        QString* errorMessage) {
     const QDir packageDir(installerDirectory);
 
     if (!packageDir.exists()) {
@@ -27,37 +27,37 @@ std::optional<InstallerCommand> resolveInstallerCommand(const QString& installer
         return std::nullopt;
     }
 
-    //For Windows
-    #if defined(Q_OS_WIN)
-        const QString launcher = packageDir.filePath("install on Windows.exe");
+// For Windows
+#if defined(Q_OS_WIN)
+    const QString launcher = packageDir.filePath("install on Windows.exe");
 
-        if (!QFileInfo::exists(launcher)) {
-            *errorMessage = "This folder does not contain the Windows SMAPI installer.";
-            return std::nullopt;
-        }
+    if (!QFileInfo::exists(launcher)) {
+        *errorMessage = "This folder does not contain the Windows SMAPI installer.";
+        return std::nullopt;
+    }
 
-        return InstallerCommand{.program = launcher, .arguments = {}};
-    //For MACOS
-    #elif defined(Q_OS_MACOS)
-        const QString launcher = packageDir.filePath("install on macOS.command");
+    return InstallerCommand{.program = launcher, .arguments = {}};
+// For MACOS
+#elif defined(Q_OS_MACOS)
+    const QString launcher = packageDir.filePath("install on macOS.command");
 
-        if (!QFileInfo(launcher).isFile()) {
-            *errorMessage = "This folder does not contain the macOS SMAPI installer.";
-            return std::nullopt;
-        }
+    if (!QFileInfo(launcher).isFile()) {
+        *errorMessage = "This folder does not contain the macOS SMAPI installer.";
+        return std::nullopt;
+    }
 
-        return InstallerCommand{.program = "/bin/sh", .arguments = {launcher}};
-    //For Linux
-    #else
-        const QString launcher = packageDir.filePath("install on Linux.sh");
+    return InstallerCommand{.program = "/bin/sh", .arguments = {launcher}};
+// For Linux
+#else
+    const QString launcher = packageDir.filePath("install on Linux.sh");
 
-        if (!QFileInfo(launcher).isFile()) {
-            *errorMessage = "This folder does not contain the Linux SMAPI installer.";
-            return std::nullopt;
-        }
+    if (!QFileInfo(launcher).isFile()) {
+        *errorMessage = "This folder does not contain the Linux SMAPI installer.";
+        return std::nullopt;
+    }
 
-        return InstallerCommand{.program = "/bin/sh", .arguments = {launcher}};
-    #endif
+    return InstallerCommand{.program = "/bin/sh", .arguments = {launcher}};
+#endif
 }
 
 /*
@@ -65,15 +65,14 @@ std::optional<InstallerCommand> resolveInstallerCommand(const QString& installer
  * @param the game directory
  * @param the location of the installer
  */
-InstallResult SmapiInstaller::install(const QString& gameDirectory, const QString& installerPath) const {
+InstallResult SmapiInstaller::install(const QString& gameDirectory,
+                                      const QString& installerPath) const {
     const QDir gameDir(gameDirectory);
 
     // Validate game directory
     if (!gameDir.exists()) {
-        return {
-            .status = InstallStatus::InvalidGameDirectory,
-            .message = "The Stardew Valley game directory does not exist."
-        };
+        return {.status = InstallStatus::InvalidGameDirectory,
+                .message = "The Stardew Valley game directory does not exist."};
     }
 
     // Resolve Command
@@ -81,18 +80,12 @@ InstallResult SmapiInstaller::install(const QString& gameDirectory, const QStrin
     const auto command = resolveInstallerCommand(installerPath, &resolverError);
 
     if (!command) {
-        return {
-            .status = InstallStatus::InvalidInstaller,
-            .message = resolverError
-        };
+        return {.status = InstallStatus::InvalidInstaller, .message = resolverError};
     }
 
     // Command arguments
     QStringList arguments = command->arguments;
-    arguments << "--no-prompt"
-              << "--install"
-              << "--game-path"
-              << gameDir.absolutePath();
+    arguments << "--no-prompt" << "--install" << "--game-path" << gameDir.absolutePath();
 
     QProcess process;
     process.setWorkingDirectory(QDir(installerPath).absolutePath());
@@ -102,11 +95,9 @@ InstallResult SmapiInstaller::install(const QString& gameDirectory, const QStrin
     process.start();
 
     if (!process.waitForStarted()) {
-        return {
-            .status = InstallStatus::ProcessStartFailed,
-            .message = process.errorString(),
-            .standardError = QString::fromUtf8(process.readAllStandardError())
-        };
+        return {.status = InstallStatus::ProcessStartFailed,
+                .message = process.errorString(),
+                .standardError = QString::fromUtf8(process.readAllStandardError())};
     }
 
     process.waitForFinished(-1);
@@ -115,32 +106,26 @@ InstallResult SmapiInstaller::install(const QString& gameDirectory, const QStrin
     const QString error = QString::fromUtf8(process.readAllStandardError());
 
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
-        return {
-            .status = InstallStatus::InstallerFailed,
-            .message = "The SMAPI installer did not complete successfully.",
-            .exitCode = process.exitCode(),
-            .standardOutput = output,
-            .standardError = error
-        };
+        return {.status = InstallStatus::InstallerFailed,
+                .message = "The SMAPI installer did not complete successfully.",
+                .exitCode = process.exitCode(),
+                .standardOutput = output,
+                .standardError = error};
     }
 
     if (!isInstalled(gameDir.absolutePath())) {
-        return {
-            .status = InstallStatus::VerificationFailed,
-            .message = "SMAPI finished, but its installed files could not be verified.",
-            .exitCode = process.exitCode(),
-            .standardOutput = output,
-            .standardError = error
-        };
+        return {.status = InstallStatus::VerificationFailed,
+                .message = "SMAPI finished, but its installed files could not be verified.",
+                .exitCode = process.exitCode(),
+                .standardOutput = output,
+                .standardError = error};
     }
 
-    return {
-        .status = InstallStatus::Success,
-        .message = "SMAPI installed successfully.",
-        .exitCode = process.exitCode(),
-        .standardOutput = output,
-        .standardError = error
-    };
+    return {.status = InstallStatus::Success,
+            .message = "SMAPI installed successfully.",
+            .exitCode = process.exitCode(),
+            .standardOutput = output,
+            .standardError = error};
 }
 
 /*

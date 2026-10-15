@@ -42,3 +42,13 @@ QStatusBar { background: #1b232a; color: #adbbb9; border-top: 1px solid #303b43;
 QScrollBar:vertical { background: #182126; width: 10px; }
 QScrollBar::handle:vertical { background: #52665f; border-radius: 4px; min-height: 24px; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QTableWidget { background: #182126; alternate-background-color: #202c31;
+               border: 1px solid #303b43; gridline-color: #303b43;
+               selection-background-color: #304d42; selection-color: #e5ebe8; }
+QTableWidget::item { padding: 8px; }
+QTableWidget::item:focus { border: 1px solid #8bd6b8; }
+QHeaderView::section { background: #273239; color: #c5d8cd; border: none;
+                       border-bottom: 1px solid #3b4a52; padding: 8px; }
+QProgressBar { background: #182126; border: 1px solid #3b4a52; border-radius: 4px;
+               min-height: 12px; text-align: center; }
+QProgressBar::chunk { background: #8bd6b8; }

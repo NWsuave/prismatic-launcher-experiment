@@ -1,8 +1,9 @@
 {
   "name": "prismaticlauncher",
-  "version-string": "0.0.0",
-  "description": "Infrastructure manifest for the future Prismatic Launcher Qt desktop application.",
+  "version-string": "0.2.0",
+  "description": "Local Stardew Valley launcher and isolated SMAPI mod profile manager.",
   "dependencies": [
-    "qtbase"
+    "qtbase",
+    "libarchive"
   ]
 }

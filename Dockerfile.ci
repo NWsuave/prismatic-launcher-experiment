@@ -15,6 +15,7 @@ RUN apt-get update \
         g++ \
         gcovr \
         git \
+        libarchive-dev \
         libgl1-mesa-dev \
         ninja-build \
         qt6-base-dev \
