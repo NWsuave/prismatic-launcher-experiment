@@ -97,10 +97,10 @@ jobs:
             echo "has_source=false" >> "$GITHUB_OUTPUT"
             echo "No C/C++ source found; skipping CodeQL."
           fi
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         if: steps.source-check.outputs.has_source == 'true'
         with:
           languages: c-cpp
           build-mode: none
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
         if: steps.source-check.outputs.has_source == 'true'
