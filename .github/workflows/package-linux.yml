@@ -60,7 +60,7 @@ jobs:
           APPIMAGE_RUNTIME_SHA256: ${{ inputs.runtime_sha256 }}
         run: ./scripts/package-linux.sh
       - name: Upload local packaging artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: PrismaticLauncher-linux-x86_64
           path: |
