@@ -56,7 +56,7 @@ jobs:
       - name: Build, test, deploy, verify and ZIP
         run: ./scripts/package-windows.ps1 -BuildDir build/windows-release -QtBinDir "$env:QT_ROOT_DIR/bin" -RuntimeDirectories "$env:GITHUB_WORKSPACE/build/windows-dependencies/x64-windows/bin"
       - name: Upload private workflow artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: PrismaticLauncher-windows-x64
           path: |
@@ -65,7 +65,7 @@ jobs:
           if-no-files-found: error
       - name: Upload test diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-package-diagnostics
           path: build/windows-release/Testing/Temporary/
