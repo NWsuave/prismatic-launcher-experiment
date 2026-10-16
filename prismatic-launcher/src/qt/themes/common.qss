@@ -1,0 +1,80 @@
+/* Semantic colors come from the active application palette. Keep widget
+   coverage here, separate from preference storage and theme-specific details. */
+QWidget { background: palette(window); color: palette(window-text); font-size: 14px; }
+QLabel { background: transparent; }
+QWidget#header, QStatusBar { background: palette(base); border-bottom: 1px solid palette(mid); }
+QLabel#brandMark { color: palette(highlight); font-size: 32px; }
+QLabel#brand { font-size: 18px; font-weight: 700; letter-spacing: 3px; }
+QLabel#heading { font-size: 32px; font-weight: 700; }
+QLabel#sectionTitle { font-size: 22px; font-weight: 600; }
+QLabel#eyebrow { color: palette(bright-text); font-size: 11px; font-weight: 600; letter-spacing: 2px; }
+QLabel#muted { color: palette(bright-text); font-size: 13px; }
+QLabel#emptyIcon { color: palette(highlight); font-size: 64px; }
+QLabel#emptyTitle { font-size: 18px; font-weight: 600; }
+QPushButton, QToolButton { background: palette(button); color: palette(button-text);
+    border: 1px solid palette(mid); border-radius: 6px; padding: 10px 16px; font-weight: 600; }
+QPushButton:hover, QToolButton:hover { border-color: palette(highlight); }
+QPushButton:pressed, QToolButton:pressed { background: palette(base); }
+QPushButton#primary { background: palette(highlight); color: palette(highlighted-text);
+    border-color: palette(highlight); }
+QPushButton:disabled, QToolButton:disabled { color: palette(bright-text); background: palette(window); }
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QDateTimeEdit {
+    background: palette(base); color: palette(text); border: 1px solid palette(mid);
+    border-radius: 6px; padding: 10px; selection-background-color: palette(highlight);
+    selection-color: palette(highlighted-text); }
+QComboBox::drop-down { width: 24px; border: none; }
+QComboBox QAbstractItemView { background: palette(base); color: palette(text);
+    selection-background-color: palette(highlight); selection-color: palette(highlighted-text); }
+QListWidget#instances { border: 1px solid palette(mid); border-radius: 8px;
+    background: palette(base); padding: 16px; }
+QListWidget#instances::item { background: palette(button); border: 1px solid palette(mid);
+    border-radius: 8px; padding: 8px; }
+QListWidget#instances::item:selected { background: palette(highlight); color: palette(highlighted-text);
+    border: 2px solid palette(highlight); }
+QWidget#sidebar { background: palette(base); border: 1px solid palette(mid); border-radius: 8px; }
+QListWidget#navigation { background: transparent; border: none; }
+QListWidget#navigation::item { padding: 14px 12px; border-radius: 6px; margin-bottom: 4px; }
+QListWidget#navigation::item:selected { background: palette(highlight); color: palette(highlighted-text); }
+QListWidget#navigation::item:hover { border: 1px solid palette(highlight); }
+QStackedWidget#detailPages, QGroupBox { border: 1px solid palette(mid); border-radius: 8px; }
+QGroupBox { margin-top: 12px; padding: 12px; }
+QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; }
+QPlainTextEdit, QTextEdit, QTextBrowser { background: palette(base); color: palette(text);
+    border: 1px solid palette(mid); border-radius: 6px; padding: 12px;
+    selection-background-color: palette(highlight); selection-color: palette(highlighted-text); }
+QPlainTextEdit { font-family: "Cascadia Mono", "Consolas", "Menlo", "DejaVu Sans Mono", monospace; }
+QStatusBar { color: palette(bright-text); border-top: 1px solid palette(mid); font-size: 12px; }
+QAbstractItemView { background: palette(base); color: palette(text); alternate-background-color: palette(alternate-base);
+    border: 1px solid palette(mid); selection-background-color: palette(highlight);
+    selection-color: palette(highlighted-text); }
+QTableWidget, QTableView { gridline-color: palette(mid); }
+QTableWidget::item, QTableView::item, QTreeWidget::item { padding: 8px; }
+QHeaderView::section { background: palette(button); color: palette(button-text); border: none;
+    border-bottom: 1px solid palette(mid); padding: 8px; }
+QProgressBar { background: palette(base); border: 1px solid palette(mid); border-radius: 4px;
+    min-height: 12px; text-align: center; }
+QProgressBar::chunk { background: palette(highlight); }
+QScrollBar:vertical { background: palette(base); width: 12px; }
+QScrollBar::handle:vertical { background: palette(mid); border-radius: 4px; min-height: 24px; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar:horizontal { background: palette(base); height: 12px; }
+QScrollBar::handle:horizontal { background: palette(mid); border-radius: 4px; min-width: 24px; }
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+QMenu, QMenuBar { background: palette(base); color: palette(text); }
+QMenu::item { padding: 8px 24px; }
+QMenu::item:selected, QMenuBar::item:selected { background: palette(highlight); color: palette(highlighted-text); }
+QMenu::separator { height: 1px; background: palette(mid); margin: 4px; }
+QToolTip { background: palette(tool-tip-base); color: palette(tool-tip-text); border: 1px solid palette(mid); padding: 6px; }
+QTabWidget::pane { border: 1px solid palette(mid); }
+QTabBar::tab { background: palette(button); padding: 8px 12px; border: 1px solid palette(mid); }
+QTabBar::tab:selected { background: palette(highlight); color: palette(highlighted-text); }
+QCheckBox, QRadioButton { spacing: 8px; background: transparent; }
+QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid palette(mid); background: palette(base); }
+QCheckBox::indicator:checked { background: palette(highlight); border: 3px solid palette(window); }
+QRadioButton::indicator { width: 16px; height: 16px; border: 1px solid palette(mid); border-radius: 8px; background: palette(base); }
+QRadioButton::indicator:checked { background: palette(highlight); border: 3px solid palette(window); }
+QPushButton:focus, QToolButton:focus, QLineEdit:focus, QComboBox:focus, QPlainTextEdit:focus,
+QTextEdit:focus, QAbstractItemView:focus, QCheckBox:focus, QRadioButton:focus, QSpinBox:focus {
+    border: 2px solid palette(highlight); }
+QPushButton#primary:focus { border: 2px solid palette(window-text); }
+QAbstractItemView::item:focus { border: 1px solid palette(highlight); }

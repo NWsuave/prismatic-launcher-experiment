@@ -1,0 +1,6 @@
+/* Original charcoal-and-mint appearance. */
+QWidget { font-family: "Segoe UI", "Helvetica Neue", "DejaVu Sans", sans-serif; }
+QPlainTextEdit { font-family: "Cascadia Mono", "Consolas", "Menlo", "DejaVu Sans Mono", monospace; }
+QPushButton#primary:hover { background: #a4e6ca; }
+QListWidget#instances::item:selected { background: #283e38; color: #e5ebe8; }
+QListWidget#navigation::item:selected { background: #304d42; color: #a4e6ca; }

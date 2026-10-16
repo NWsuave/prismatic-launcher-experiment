@@ -2,23 +2,23 @@
 
 ## Project status
 
-Prismatic Launcher is a local C++20/Qt 6 Widgets desktop mod launcher. The user's autonomous product implementation mission extends the original infrastructure-only foundation. Read `infrastructure_plan.md`, `docs/decisions/001-local-mod-profiles.md`, and `PROGRESS.md` for current decisions, limitations, and verification. The historical infrastructure plan is in `prismatic-launcher/documents/infrastructure_plan.md`.
+Prismatic Launcher is a local C++20/Qt 6 Widgets desktop mod launcher. The user's autonomous product implementation mission extends the original infrastructure-only foundation. Read `infrastructure_plan.md`, `docs/decisions/001-local-mod-profiles.md`, `docs/decisions/002-phase2-mod-services-and-packaging.md`, and `PROGRESS.md` for current decisions, limitations, and verification. `docs/phase2-report.md` records packaging artifacts and native-platform limits. The historical infrastructure plan is in `prismatic-launcher/documents/infrastructure_plan.md`.
 
 ## Repository map
 
 - `CMakeLists.txt`, `CMakePresets.json` — CMake/CTest configuration.
 - `vcpkg.json`, `vcpkg-configuration.json` — C++ dependency manifest and pinned registry baseline.
 - `scripts/` — infrastructure checks and Linux CI entrypoint.
-- `tests/infrastructure/` — infrastructure-only test location; product tests are not created yet.
+- `tests/infrastructure/` — historical infrastructure-only test location; product tests live under `tests/core/` and `tests/ui/`.
 - `Dockerfile.ci`, `.dockerignore` — Linux validation infrastructure only.
-- `.github/workflows/pr-checks.yml`, `.github/workflows/release.yml` — CI and guarded release workflows.
+- `.github/workflows/pr-checks.yml`, `.github/workflows/package-*.yml`, `.github/workflows/release.yml` — CI, native artifact builds, and manual packaging-policy validation; no automatic release publication.
 - `README.md`, `infrastructure_plan.md` — developer documentation and approved plan.
 - `PROGRESS.md`, `docs/decisions/` — resumable status and implementation decisions.
-- `src/core/` — explicit core modules for atomic files, instances, game launching, and mods.
+- `src/core/` — explicit core modules for atomic files, standard data paths/migration, instances, game launching, mods, global inventory, dependency resolution, and reviewed download sources.
 - `prismatic-launcher/src/qt/` — canonical Qt UI and application entry point.
 - `tests/core/`, `tests/ui/` — fixture-based core and offscreen widget tests.
 - `.agents/skills/` — local skill instructions.
-- `packaging/`, backend/API directories — not implemented. Historical alternate entry points and old SMAPI utilities remain unbuilt reference sources.
+- `packaging/` — native runtime deployment helpers, offline packaging-policy tests, desktop integration, and reviewed dependency catalog. Backend/API directories remain unimplemented. Historical alternate entry points and old SMAPI utilities remain unbuilt reference sources.
 
 ## Required reading and skill selection
 
@@ -29,6 +29,7 @@ Read `infrastructure_plan.md`, this file, and the relevant `.agents/skills/*/SKI
 - Preserve the instance isolation contract: game files and saves are shared, profile mods are separate. Never swap or overwrite the game's existing Mods directory.
 - Keep development writes inside this experimental worktree, use disposable fixtures, and never execute game/mod binaries in tests. Do not contact GitHub, push, publish, or alter Git remotes.
 - Preserve C++20, Qt 6, vcpkg and the documented infrastructure. JSON is the experimental persistence implementation; SQLite is a historical plan, not a shipped feature. Record architectural changes in decisions and progress documentation.
+- Default persistence uses Qt AppLocalDataLocation outside application bundles; explicit development roots remain available. Never treat another profile's dependency installation as satisfying the selected profile. Arbitrary update keys do not establish trusted publishers; downloads require explicit user authorization and the safe archive installer. Ordinary tests use mocked providers only.
 - Do not commit secrets, signing certificates, generated build output, coverage reports, vcpkg installations, or local game/mod data.
 - Docker validates Linux only; it does not replace native Windows/macOS packaging, signing, or macOS notarization.
 

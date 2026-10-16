@@ -1,85 +1,26 @@
-name: Release portable archives
+name: Packaging policy validation
 
+# Native artifact creation lives in package-macos.yml, package-linux.yml, and
+# package-windows.yml. This repository does not publish releases automatically.
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing v* tag to validate and release
-        required: true
-        type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  prerequisites:
-    name: Validate release prerequisites
+  policy:
     runs-on: ubuntu-24.04
-    environment: release
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Require future product packaging configuration
+      - name: Validate native packaging entry points
         run: |
-          test -f packaging/CMakeLists.txt || {
-            echo 'Release packaging has not been implemented. Add product-owned packaging configuration before releasing.' >&2
-            exit 1
-          }
-      - name: Require macOS notarization configuration
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-        run: |
-          test -n "$APPLE_CERTIFICATE" && test -n "$APPLE_CERTIFICATE_PASSWORD" && \
-          test -n "$APPLE_ID" && test -n "$APPLE_APP_SPECIFIC_PASSWORD" && test -n "$APPLE_TEAM_ID" || {
-            echo 'macOS signing and notarization configuration is incomplete.' >&2
-            exit 1
-          }
-
-  build:
-    name: Build portable archive (${{ matrix.name }})
-    needs: prerequisites
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: windows
-            os: windows-2022
-            archive: zip
-          - name: macos
-            os: macos-14
-            archive: zip
-          - name: linux
-            os: ubuntu-24.04
-            archive: tar.gz
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build, test, package, and sign
-        run: packaging/release-${{ matrix.name }}.${{ runner.os == 'Windows' && 'ps1' || 'sh' }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.name }}-portable-archive
-          path: dist/*.${{ matrix.archive }}
-          if-no-files-found: error
-
-  publish:
-    name: Publish GitHub Release
-    needs: build
-    runs-on: ubuntu-24.04
-    environment: release
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-      - name: Generate SHA-256 checksums
-        run: cd dist && sha256sum * > SHA256SUMS.txt
-      - name: Create release with portable archives
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name || inputs.tag }}" dist/* --generate-notes
+          bash -n scripts/package-macos.sh
+          bash -n scripts/package-linux.sh
+          test -f scripts/package-windows.ps1
+          test -f .github/workflows/package-macos.yml
+          test -f .github/workflows/package-linux.yml
+          test -f .github/workflows/package-windows.yml
+      - name: Verify host-independent deployment safety
+        run: python3 -B -m unittest discover -s packaging/macos -p 'test_*.py'

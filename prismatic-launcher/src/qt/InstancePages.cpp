@@ -14,6 +14,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QStatusBar>
 #include <QTableWidget>
@@ -21,8 +22,10 @@
 #include <QtConcurrentRun>
 
 #include "AtomicFile.h"
+#include "DependencyResolver.h"
 #include "GameLauncher.h"
 #include "LauncherWindow.h"
+#include "ThemeManager.h"
 
 namespace {
 QLabel* label(const QString& text, const QString& role) {
@@ -101,6 +104,13 @@ QWidget* LauncherWindow::createModsPage() {
     tools->addWidget(zip);
     tools->addWidget(folder);
     tools->addWidget(refresh);
+    auto* dependencies = new QPushButton("Check dependencies…");
+    dependencies->setObjectName("checkDependencies");
+    dependencies->setProperty("requiresIdle", true);
+    tools->addWidget(dependencies);
+    connect(dependencies, &QPushButton::clicked, this, [this] {
+        if (const auto profile = selectedInstance()) inspectDependencies(profile->id);
+    });
     tools->addStretch();
     layout->addLayout(tools);
     mods_ = new QTableWidget(0, 5);
@@ -186,6 +196,19 @@ void LauncherWindow::refreshMods() {
                 "Showing the first 10000 mods. This profile exceeds the display limit.");
         }
         if (!result.second.isEmpty()) appendLog("Mod scan: " + result.second);
+        const auto dependencies = prismatic::DependencyResolver::resolve(installedMods_);
+        if (dependencies.hasBlockingIssues()) {
+            modStatus_->setText(modStatus_->text() +
+                                "\nRequired dependencies need attention. Use Check dependencies.");
+            modStatus_->setToolTip(dependencies.summary());
+            appendLog("Dependency check: " + dependencies.summary());
+        } else {
+            modStatus_->setToolTip({});
+        }
+        if (dependencyPromptProfileId_ == id) {
+            dependencyPromptProfileId_.clear();
+            if (dependencies.hasBlockingIssues()) inspectDependencies(id);
+        }
     });
     watcher->setFuture(QtConcurrent::run([profile] {
         QString error;
@@ -204,13 +227,19 @@ void LauncherWindow::installMods(bool archive) {
                             : QFileDialog::getExistingDirectory(this, "Install local mod folder");
     if (source.isEmpty()) return;
     const auto profile = store_->profilePath(instance->id);
-    runTask("Installing local mods…", [profile, source, archive] {
-        prismatic::ModManager manager(profile);
-        QString error;
-        const bool success =
-            archive ? manager.installZip(source, &error) : manager.installFolder(source, &error);
-        return success ? QString() : error;
-    });
+    const auto installed = std::make_shared<bool>(false);
+    runTask(
+        "Installing local mods…",
+        [profile, source, archive, installed] {
+            prismatic::ModManager manager(profile);
+            QString error;
+            *installed = archive ? manager.installZip(source, &error)
+                                 : manager.installFolder(source, &error);
+            return *installed ? QString() : error;
+        },
+        [this, installed, id = instance->id] {
+            if (*installed) dependencyPromptProfileId_ = id;
+        });
 }
 
 void LauncherWindow::toggleMod() {
@@ -219,6 +248,7 @@ void LauncherWindow::toggleMod() {
     const int row = mods_->currentRow();
     if (!instance || row < 0 || row >= installedMods_.size()) return;
     const auto mod = installedMods_.at(row);
+    if (!mod.enabled && !confirmDependencies(instance->id, mod.manifest.uniqueId)) return;
     const auto profile = store_->profilePath(instance->id);
     runTask(mod.enabled ? "Disabling mod…" : "Enabling mod…", [profile, mod] {
         QString error;
@@ -296,6 +326,20 @@ QWidget* LauncherWindow::createSettingsPage() {
     layout->setSpacing(16);
     layout->addWidget(label("Instance settings", "sectionTitle"));
     auto* form = new QFormLayout;
+    auto* theme = new QComboBox;
+    theme->setObjectName("themeSelector");
+    theme->setAccessibleName("Application theme");
+    for (const auto& entry : ThemeManager::themes()) theme->addItem(entry.name, entry.id);
+    theme->setCurrentIndex(theme->findData(themes_->currentThemeId()));
+    form->addRow("Application theme", theme);
+    connect(theme, &QComboBox::currentIndexChanged, this, [this, theme] {
+        QString error;
+        if (!themes_->setTheme(theme->currentData().toString(), &error)) {
+            const QSignalBlocker blocker(theme);
+            theme->setCurrentIndex(theme->findData(themes_->currentThemeId()));
+            reportError(error);
+        }
+    });
     launchMode_ = new QComboBox;
     launchMode_->setObjectName("launchMode");
     launchMode_->addItems({"Vanilla", "Modded (SMAPI)"});

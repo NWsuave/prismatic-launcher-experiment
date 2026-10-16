@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "architecture": "x86_64",
+  "format": "AppImage type 2",
+  "provenance": "Official binaries supplied by the user; local hashes, ELF architecture, type-2 header and embedded versions verified without remote requests.",
+  "appimagetool": {
+    "file": "appimagetool-x86_64.AppImage",
+    "project": "https://github.com/AppImage/appimagetool",
+    "gitCommit": "854e19e",
+    "build": 313,
+    "builtAt": "2026-10-04T14:58:08Z",
+    "sha256": "95cbe7cce9717fce90c484e34052ee7c7f1d7635b33c12525b4776826a7d29b6"
+  },
+  "runtime": {
+    "file": "runtime-x86_64",
+    "project": "https://github.com/AppImage/type2-runtime",
+    "gitCommit": "8f39b89",
+    "size": 944632,
+    "sha256": "156f4bdbde9c52d01814600013e0a273f0118dc2de98975f3c8c63427ec79074"
+  }
+}

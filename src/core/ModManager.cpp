@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLockFile>
@@ -19,6 +20,8 @@
 #include <cstdio>
 #include <limits>
 #include <memory>
+
+#include "DependencyResolver.h"
 
 namespace prismatic {
 namespace {
@@ -488,12 +491,87 @@ std::optional<ModManifest> ModManager::parseManifest(const QString& path, QStrin
         if (matches != 1 || result.size() > 512 || result.contains(QChar::Null)) return {};
         return result;
     };
-    ModManifest manifest{field("Name"), field("Author"), field("Version"), field("UniqueID")};
+    ModManifest manifest;
+    manifest.name = field("Name");
+    manifest.author = field("Author");
+    manifest.version = field("Version");
+    manifest.uniqueId = field("UniqueID");
     static const QRegularExpression validId(QStringLiteral("^[A-Za-z0-9_][A-Za-z0-9_.-]{0,199}$"));
     if (manifest.name.isEmpty() || manifest.author.isEmpty() || manifest.version.isEmpty() ||
         !validId.match(manifest.uniqueId).hasMatch() || !safeRelative(manifest.uniqueId, nullptr)) {
         fail(error, QStringLiteral(
                         "The manifest needs valid Name, Author, Version, and UniqueID strings."));
+        return std::nullopt;
+    }
+    bool metadataValid = true;
+    auto value = [&](const QJsonObject& source, const QString& name) -> QJsonValue {
+        QJsonValue found(QJsonValue::Undefined);
+        for (auto it = source.begin(); it != source.end(); ++it) {
+            if (it.key().compare(name, Qt::CaseInsensitive) != 0) continue;
+            if (!found.isUndefined()) metadataValid = false;
+            found = it.value();
+        }
+        return found;
+    };
+    auto text = [&](const QJsonObject& source, const QString& name, int limit = 512) {
+        const auto item = value(source, name);
+        if (item.isUndefined() || item.isNull()) return QString();
+        if (!item.isString() || item.toString().size() > limit ||
+            item.toString().contains(QChar::Null))
+            metadataValid = false;
+        return item.toString().trimmed();
+    };
+    auto dependency = [&](const QJsonValue& item, bool contentPack) -> ModDependency {
+        if (!item.isObject()) metadataValid = false;
+        const auto data = item.toObject();
+        ModDependency dep{text(data, "UniqueID"), text(data, "MinimumVersion"), true};
+        if (!validId.match(dep.uniqueId).hasMatch() || !safeRelative(dep.uniqueId, nullptr))
+            metadataValid = false;
+        const auto required = value(data, "IsRequired");
+        if (!required.isUndefined()) {
+            if (!required.isBool() || contentPack)
+                metadataValid = false;
+            else
+                dep.isRequired = required.toBool();
+        }
+        if (!dep.minimumVersion.isEmpty() &&
+            !DependencyResolver::compareVersions(dep.minimumVersion, dep.minimumVersion))
+            metadataValid = false;
+        return dep;
+    };
+    manifest.description = text(object, "Description", 8192);
+    manifest.minimumApiVersion = text(object, "MinimumApiVersion");
+    manifest.minimumGameVersion = text(object, "MinimumGameVersion");
+    for (const auto& runtime : {manifest.minimumApiVersion, manifest.minimumGameVersion})
+        if (!runtime.isEmpty() && !DependencyResolver::compareVersions(runtime, runtime))
+            metadataValid = false;
+    const auto dependencies = value(object, "Dependencies");
+    if (!dependencies.isUndefined() && !dependencies.isNull()) {
+        if (!dependencies.isArray() || dependencies.toArray().size() > 1000) metadataValid = false;
+        for (const auto& item : dependencies.toArray())
+            manifest.dependencies.append(dependency(item, false));
+    }
+    const auto contentPack = value(object, "ContentPackFor");
+    if (!contentPack.isUndefined() && !contentPack.isNull()) {
+        manifest.contentPackFor = dependency(contentPack, true);
+        if (!text(object, "EntryDll").isEmpty()) metadataValid = false;
+    }
+    const auto updates = value(object, "UpdateKeys");
+    if (!updates.isUndefined() && !updates.isNull()) {
+        if (!updates.isArray() || updates.toArray().size() > 100) metadataValid = false;
+        for (const auto& item : updates.toArray()) {
+            if (!item.isString() || item.toString().size() > 512 ||
+                item.toString().contains(QChar::Null))
+                metadataValid = false;
+            else
+                manifest.updateKeys.append(item.toString().trimmed());
+        }
+    }
+    if (!metadataValid ||
+        !DependencyResolver::compareVersions(manifest.version, manifest.version)) {
+        fail(error,
+             QStringLiteral(
+                 "Invalid SMAPI dependency, content pack, update key, or version metadata."));
         return std::nullopt;
     }
     return manifest;
@@ -613,6 +691,38 @@ bool ModManager::installZip(const QString& source, QString* error) {
     const bool result = installStaged(staging.path(), preserveStaging, error);
     if (preserveStaging) staging.setAutoRemove(false);
     return result;
+}
+
+bool ModManager::installDependencyZip(const QString& source, const QString& expectedId,
+                                      const QString& expectedVersion, QString* error) {
+    if (error) error->clear();
+    if (expectedId.isEmpty()) return fail(error, QStringLiteral("No approved dependency ID."));
+    if (!safePathSyntax(source, error)) return false;
+    const QFileInfo input(source);
+    if (!input.isFile() || isLinked(input) || !safeAncestors(input.absolutePath(), error))
+        return fail(error, QStringLiteral("Select a regular dependency ZIP file."));
+    if (!prepareLockParent(root_, error)) return false;
+    QLockFile lock(root_ + ".mods.lock");
+    if (!lockProfile(lock, root_, error) || !prepareProfile(root_, error)) return false;
+    QTemporaryDir staging(root_ + "/.install-XXXXXX");
+    if (!staging.isValid()) return fail(error, QStringLiteral("Cannot stage the dependency."));
+    if (!extractZip(source, staging.path() + "/content", error)) return false;
+    QList<InstalledMod> candidates;
+    if (!discover(staging.path() + "/content", candidates, 0, error)) return false;
+    if (candidates.size() != 1 ||
+        candidates.first().manifest.uniqueId.compare(expectedId, Qt::CaseInsensitive) != 0)
+        return fail(error,
+                    QStringLiteral("The archive must contain exactly the approved dependency."));
+    if (!expectedVersion.isEmpty()) {
+        const auto cmp = DependencyResolver::compareVersions(candidates.first().manifest.version,
+                                                             expectedVersion);
+        if (!cmp || *cmp != 0)
+            return fail(error, QStringLiteral("The archive dependency version is incompatible."));
+    }
+    bool preserve = false;
+    const bool success = installStaged(staging.path(), preserve, error);
+    if (preserve) staging.setAutoRemove(false);
+    return success;
 }
 
 bool ModManager::setEnabled(const QString& uniqueId, bool enabled, QString* error) {

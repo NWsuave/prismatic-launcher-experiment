@@ -43,6 +43,7 @@ class GameLauncherTests final : public QObject {
    private slots:
     void invalidDirectory();
     void inspectAndPlan();
+    void bundleEnvironmentDoesNotLeakIntoGame();
     void nativeWrapperNeverUsedForVanilla();
     void rejectUnsafeProfilesAndArguments();
     void inspectMacBundle();
@@ -82,6 +83,50 @@ void GameLauncherTests::inspectAndPlan() {
     QVERIFY(plan.has_value());
     QCOMPARE(plan->program, installation.vanillaExecutable);
     QVERIFY(!plan->arguments.contains("--mods-path"));
+}
+
+void GameLauncherTests::bundleEnvironmentDoesNotLeakIntoGame() {
+    const QStringList names{"LD_LIBRARY_PATH",
+                            "QT_PLUGIN_PATH",
+                            "QT_QPA_PLATFORM_PLUGIN_PATH",
+                            "QML2_IMPORT_PATH",
+                            "PRISMATIC_BUNDLED_ENV",
+                            "PRISMATIC_ORIGINAL_LD_LIBRARY_PATH",
+                            "PRISMATIC_ORIGINAL_QT_PLUGIN_PATH",
+                            "PRISMATIC_ORIGINAL_QT_QPA_PLATFORM_PLUGIN_PATH",
+                            "PRISMATIC_ORIGINAL_QML2_IMPORT_PATH"};
+    struct Restore {
+        QMap<QByteArray, QByteArray> values;
+        ~Restore() {
+            for (auto it = values.cbegin(); it != values.cend(); ++it) {
+                if (it.value().isNull())
+                    qunsetenv(it.key().constData());
+                else
+                    qputenv(it.key().constData(), it.value());
+            }
+        }
+    } restore;
+    for (const auto& name : names) restore.values.insert(name.toUtf8(), qgetenv(qPrintable(name)));
+    qputenv("PRISMATIC_BUNDLED_ENV", "1");
+    qputenv("LD_LIBRARY_PATH", "/bundle/usr/lib:/user/lib");
+    qputenv("PRISMATIC_ORIGINAL_LD_LIBRARY_PATH", "/user/lib");
+    qputenv("QT_PLUGIN_PATH", "/bundle/usr/plugins");
+    qputenv("PRISMATIC_ORIGINAL_QT_PLUGIN_PATH", "");
+    qputenv("QT_QPA_PLATFORM_PLUGIN_PATH", "/bundle/usr/plugins/platforms");
+    qputenv("PRISMATIC_ORIGINAL_QT_QPA_PLATFORM_PLUGIN_PATH", "");
+    qputenv("QML2_IMPORT_PATH", "/bundle/usr/qml");
+    qputenv("PRISMATIC_ORIGINAL_QML2_IMPORT_PATH", "");
+    QTemporaryDir fixture(QDir::currentPath() + "/launcher-fixture-XXXXXX");
+    QVERIFY(fixture.isValid());
+    QVERIFY(executable(fixture.filePath(vanillaName())));
+    auto plan = GameLauncher::prepareLaunch({GameLauncher::inspect(fixture.path()), false, {}, {}});
+    QVERIFY(plan.has_value());
+    QCOMPARE(plan->environment.value("LD_LIBRARY_PATH"), QString("/user/lib"));
+    QVERIFY(!plan->environment.contains("QT_PLUGIN_PATH"));
+    QVERIFY(!plan->environment.contains("QT_QPA_PLATFORM_PLUGIN_PATH"));
+    QVERIFY(!plan->environment.contains("QML2_IMPORT_PATH"));
+    QVERIFY(!plan->environment.contains("PRISMATIC_BUNDLED_ENV"));
+    QVERIFY(!plan->environment.contains("PRISMATIC_ORIGINAL_LD_LIBRARY_PATH"));
 }
 
 void GameLauncherTests::nativeWrapperNeverUsedForVanilla() {

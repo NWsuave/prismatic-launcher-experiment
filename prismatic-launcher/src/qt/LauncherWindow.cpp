@@ -27,7 +27,10 @@
 #include <QtConcurrentRun>
 #include <exception>
 
+#include "DependencyDialog.h"
 #include "GameLauncher.h"
+#include "ModExplorerPage.h"
+#include "ThemeManager.h"
 
 namespace {
 QIcon instanceIcon() {
@@ -60,6 +63,9 @@ LauncherWindow::LauncherWindow(const QString& configFile, QWidget* parent,
                                              : QFileInfo(dataDirectory).absoluteFilePath()),
       store_(std::make_unique<prismatic::InstanceStore>(dataDirectory_)),
       launcher_(new prismatic::GameLauncher(this)) {
+    themes_ = std::make_unique<ThemeManager>(dataDirectory_);
+    QString themeWarning;
+    themes_->load(&themeWarning);
     setWindowTitle("Prismatic Launcher");
     resize(1120, 760);
     setMinimumSize(820, 600);
@@ -79,6 +85,10 @@ LauncherWindow::LauncherWindow(const QString& configFile, QWidget* parent,
     bar->addWidget(mark);
     bar->addWidget(brand);
     bar->addStretch();
+    auto* explorer = new QPushButton("Installed mods");
+    explorer->setObjectName("openModExplorer");
+    explorer->setAccessibleName("Explore mods across all profiles");
+    bar->addWidget(explorer);
     auto* activity = new QPushButton("Logs");
     activity->setObjectName("openLogs");
     bar->addWidget(activity);
@@ -90,6 +100,28 @@ LauncherWindow::LauncherWindow(const QString& configFile, QWidget* parent,
     pages_->setObjectName("pages");
     pages_->addWidget(createLibrary());
     pages_->addWidget(createDetails());
+    auto* explorerContainer = new QWidget;
+    auto* explorerLayout = new QVBoxLayout(explorerContainer);
+    auto* back = new QPushButton("←  Library");
+    back->setObjectName("explorerBackToLibrary");
+    explorerLayout->addWidget(back, 0, Qt::AlignLeft);
+    explorer_ = new ModExplorerPage(dataDirectory_, nullptr, false);
+    explorerLayout->addWidget(explorer_, 1);
+    pages_->addWidget(explorerContainer);
+    connect(back, &QPushButton::clicked, this, [this] { pages_->setCurrentIndex(0); });
+    connect(explorer, &QPushButton::clicked, this, [this] {
+        explorerActivated_ = true;
+        pages_->setCurrentIndex(2);
+        explorer_->refresh();
+    });
+    connect(explorer_, &ModExplorerPage::errorOccurred, this, &LauncherWindow::reportError);
+    connect(explorer_, &ModExplorerPage::busyChanged, this, [this] { updateControls(); });
+    connect(explorer_, &ModExplorerPage::installationsChanged, this, [this] { refreshMods(); });
+    connect(explorer_, &ModExplorerPage::dependencyInspectionRequested, this,
+            [this](const QString& profileId, const QString&) { inspectDependencies(profileId); });
+    explorer_->setEnableCheck([this](const QString& profileId, const QString& uniqueId) {
+        return confirmDependencies(profileId, uniqueId);
+    });
     layout->addWidget(pages_, 1);
     setCentralWidget(root);
     progress_ = new QProgressBar;
@@ -138,6 +170,7 @@ LauncherWindow::LauncherWindow(const QString& configFile, QWidget* parent,
         statusBar()->showMessage("Local launcher — isolated mod profiles, shared game files.");
     }
     reloadInstances();
+    if (!themeWarning.isEmpty()) appendLog("Theme preferences: " + themeWarning);
     appendLog("Prismatic Launcher ready. Profiles share game files and saves.");
 }
 
@@ -147,7 +180,7 @@ LauncherWindow::~LauncherWindow() {
 }
 
 void LauncherWindow::closeEvent(QCloseEvent* event) {
-    if (busy_ || launcher_->running()) {
+    if (busy_ || launcher_->running() || (explorer_ && explorer_->isBusy())) {
         statusBar()->showMessage("Wait for the operation or game to finish before closing.");
         event->ignore();
         return;
@@ -238,6 +271,7 @@ std::optional<prismatic::Instance> LauncherWindow::selectedInstance() const {
 }
 
 void LauncherWindow::reloadInstances() {
+    if (explorer_ && explorerActivated_) explorer_->refresh();
     refreshing_ = true;
     instances_->clear();
     for (const auto& instance : store_->instances()) {
@@ -268,7 +302,7 @@ void LauncherWindow::filterInstances(const QString& query) {
 }
 
 bool LauncherWindow::canChange() {
-    if (busy_ || launcher_->running()) {
+    if (busy_ || launcher_->running() || (explorer_ && explorer_->isBusy())) {
         statusBar()->showMessage(busy_ ? "Wait for the current operation to finish."
                                        : "Close the game before changing profiles or mods.");
         return false;
@@ -277,7 +311,8 @@ bool LauncherWindow::canChange() {
 }
 
 void LauncherWindow::updateControls() {
-    const bool idle = !busy_ && !launcher_->running();
+    const bool idle = !busy_ && !launcher_->running() && (!explorer_ || !explorer_->isBusy());
+    if (explorer_) explorer_->setMutationAllowed(!busy_ && !launcher_->running());
     instances_->setEnabled(idle);
     for (auto* button : findChildren<QPushButton*>()) {
         if (button->property("requiresIdle").toBool()) button->setEnabled(idle);
@@ -410,9 +445,9 @@ void LauncherWindow::removeInstance() {
 void LauncherWindow::openInstance(int tab) {
     const auto instance = selectedInstance();
     if (!instance) {
-        if (tab == 1) {
+        if (tab == 1 || tab == 2) {
             detailTitle_->setText("Launcher activity");
-            navigation_->setCurrentRow(1);
+            navigation_->setCurrentRow(tab);
             pages_->setCurrentIndex(1);
         } else {
             statusBar()->showMessage("Create or select an instance first.");
@@ -461,6 +496,7 @@ void LauncherWindow::launchGame() {
         reportError("Executable not found or not runnable.\n" + error);
         return;
     }
+    if (instance->useSmapi && !confirmDependencies(instance->id)) return;
     appendLog("Launching profile: " + instance->name);
     launcher_->start(request);
 }
@@ -490,6 +526,7 @@ void LauncherWindow::runTask(const QString& description, std::function<QString()
                 }
                 if (complete) complete();
                 refreshMods();
+                if (explorer_ && explorerActivated_) explorer_->refresh();
             });
     watcher->setFuture(QtConcurrent::run([operation = std::move(operation)] {
         try {
@@ -507,6 +544,40 @@ void LauncherWindow::reportError(const QString& message) {
     QMessageBox box(QMessageBox::Warning, "Prismatic Launcher", message, QMessageBox::Ok, this);
     box.setTextFormat(Qt::PlainText);
     box.exec();
+}
+
+bool LauncherWindow::confirmDependencies(const QString& profileId, const QString& enablingId) {
+    QString error;
+    auto mods = prismatic::ModManager(store_->profilePath(profileId)).mods(&error);
+    if (!error.isEmpty()) {
+        reportError("Cannot validate profile dependencies: " + error);
+        return false;
+    }
+    for (auto& mod : mods) {
+        if (mod.manifest.uniqueId.compare(enablingId, Qt::CaseInsensitive) == 0) mod.enabled = true;
+    }
+    const auto result = prismatic::DependencyResolver::resolve(mods);
+    if (!result.hasBlockingIssues()) return true;
+    QMessageBox warning(QMessageBox::Warning, "Unresolved profile dependencies",
+                        "This profile has unresolved required dependencies. Continue anyway?\n\n" +
+                            result.summary() +
+                            "\n\nUse Check dependencies to inspect and resolve them.",
+                        QMessageBox::Yes | QMessageBox::Cancel, this);
+    warning.setTextFormat(Qt::PlainText);
+    warning.setDefaultButton(QMessageBox::Cancel);
+    return warning.exec() == QMessageBox::Yes;
+}
+
+void LauncherWindow::inspectDependencies(const QString& profileId) {
+    if (!canChange() || !store_->find(profileId)) return;
+    busy_ = true;
+    updateControls();
+    DependencyDialog dialog(dataDirectory_, store_->profilePath(profileId), this);
+    dialog.exec();
+    busy_ = false;
+    refreshMods();
+    updateControls();
+    if (explorer_ && explorerActivated_) explorer_->refresh();
 }
 
 QString LauncherWindow::redacted(const QString& text) const {

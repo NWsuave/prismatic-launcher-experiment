@@ -18,6 +18,8 @@ class QComboBox;
 class QTableWidget;
 class QProgressBar;
 class QCloseEvent;
+class ModExplorerPage;
+class ThemeManager;
 namespace prismatic {
 class GameLauncher;
 }
@@ -61,14 +63,20 @@ class LauncherWindow : public QMainWindow {
     void renderLogs();
     QString redacted(const QString& text) const;
     void reportError(const QString& message);
+    void inspectDependencies(const QString& profileId);
+    bool confirmDependencies(const QString& profileId, const QString& enablingId = {});
 
     LauncherConfig config_;
     QString dataDirectory_;
     std::unique_ptr<prismatic::InstanceStore> store_;
     prismatic::GameLauncher* launcher_ = nullptr;
+    std::unique_ptr<ThemeManager> themes_;
+    ModExplorerPage* explorer_ = nullptr;
+    bool explorerActivated_ = false;
     bool busy_ = false;
     bool refreshing_ = false;
     QStringList logLines_;
+    QString dependencyPromptProfileId_;
     QList<prismatic::InstalledMod> installedMods_;
     QStackedWidget* pages_ = nullptr;
     QStackedWidget* detailPages_ = nullptr;

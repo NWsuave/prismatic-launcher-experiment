@@ -1,0 +1,50 @@
+name: Package macOS development artifacts
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'CMakeLists.txt'
+      - 'prismatic-launcher/src/qt/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'packaging/macos/**'
+      - 'scripts/package-macos.sh'
+      - '.github/workflows/package-macos.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: macos-14
+    timeout-minutes: 40
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '12.0'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt SDK
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          cache: true
+      - name: Install build dependencies
+        run: brew install cmake ninja libarchive
+      - name: Configure native release build
+        run: >-
+          cmake -S . -B build/package-macos -G Ninja
+          -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          -DLibArchive_ROOT="$(brew --prefix libarchive)"
+      - name: Verify packaging logic
+        run: python3 -m unittest discover -s packaging/macos -p 'test_*.py' -v
+      - name: Build, test, deploy, audit, and create DMG
+        run: bash scripts/package-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PrismaticLauncher-macos-development
+          path: |
+            dist/macos/*.app.zip
+            dist/macos/*.dmg
+            dist/macos/*.SHA256SUMS
+          if-no-files-found: error

@@ -1,0 +1,11 @@
+/* Vintage phosphor-green terminal with restrained amber labels. */
+QWidget { font-family: "Cascadia Mono", "Consolas", "Menlo", "DejaVu Sans Mono", monospace; }
+QWidget#header { border-bottom: 2px solid #587b48; }
+QLabel#brand, QLabel#eyebrow, QLabel#sectionTitle { color: #e2be73; }
+QLabel#brand { letter-spacing: 2px; }
+QLabel#heading { font-size: 28px; }
+QPushButton, QToolButton, QLineEdit, QComboBox, QPlainTextEdit, QTextEdit,
+QWidget#sidebar, QStackedWidget#detailPages, QListWidget#instances,
+QListWidget#instances::item, QListWidget#navigation::item, QGroupBox, QProgressBar,
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal { border-radius: 0; }
+QPushButton#primary:hover { background: #b8e6a8; }

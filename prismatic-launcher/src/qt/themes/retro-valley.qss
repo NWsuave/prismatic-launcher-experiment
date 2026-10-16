@@ -1,0 +1,12 @@
+/* Original pixel-inspired geometry; no game artwork or bundled game fonts. */
+QWidget { font-family: "Verdana", "Trebuchet MS", "DejaVu Sans", sans-serif; }
+QWidget#header { border-bottom: 3px solid #9a762e; }
+QLabel#brandMark { color: #73551d; }
+QLabel#brand { letter-spacing: 2px; }
+QPushButton, QToolButton, QLineEdit, QComboBox, QPlainTextEdit, QTextEdit,
+QWidget#sidebar, QStackedWidget#detailPages, QListWidget#instances,
+QListWidget#instances::item, QListWidget#navigation::item, QGroupBox { border-radius: 0; }
+QPushButton, QToolButton { border-bottom: 3px solid #93845a; }
+QPushButton#primary:hover { background: #647632; }
+QLabel#heading, QLabel#sectionTitle { color: #513e23; }
+QPlainTextEdit { font-family: "Cascadia Mono", "Consolas", "Menlo", "DejaVu Sans Mono", monospace; }

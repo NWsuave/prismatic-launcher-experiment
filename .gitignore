@@ -1,6 +1,9 @@
 # Build output and CMake state
 /build/
 /out/
+/dist/
+__pycache__/
+*.pyc
 CMakeCache.txt
 CMakeFiles/
 CTestTestfile.cmake
@@ -24,6 +27,8 @@ clang-tidy*.yaml
 /vcpkg/packages/
 /vcpkg/downloads/
 /.cache/
+/tools/appimage/appimagetool-x86_64.AppImage
+/tools/appimage/runtime-x86_64
 
 # Logs and local application data
 *.log

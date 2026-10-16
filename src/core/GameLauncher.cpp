@@ -183,6 +183,20 @@ std::optional<LaunchPlan> GameLauncher::prepareLaunch(const LaunchRequest& reque
     }
     LaunchPlan plan{program, request.arguments, installation.gameDirectory,
                     QProcessEnvironment::systemEnvironment()};
+    // AppImage deployment paths belong to the launcher, not the external game.
+    if (plan.environment.value("PRISMATIC_BUNDLED_ENV") == "1") {
+        for (const auto* name : {"LD_LIBRARY_PATH", "QT_PLUGIN_PATH", "QT_QPA_PLATFORM_PLUGIN_PATH",
+                                 "QML2_IMPORT_PATH"}) {
+            const auto original = QString("PRISMATIC_ORIGINAL_") + name;
+            const auto value = plan.environment.value(original);
+            if (value.isEmpty())
+                plan.environment.remove(name);
+            else
+                plan.environment.insert(name, value);
+            plan.environment.remove(original);
+        }
+        plan.environment.remove("PRISMATIC_BUNDLED_ENV");
+    }
     // Do not inherit a global override that could load another profile's mods.
     plan.environment.remove("SMAPI_MODS_PATH");
     if (request.useSmapi) {

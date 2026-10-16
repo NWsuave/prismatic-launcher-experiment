@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "uniqueId": "Pathoschild.ContentPatcher",
+      "publisher": "Pathoschild",
+      "repository": "Pathoschild/StardewMods",
+      "identityEvidence": "https://stardewvalleywiki.com/Modding:Content_Patcher",
+      "officialPage": "https://www.nexusmods.com/stardewvalley/mods/1915",
+      "assetPattern": "^ContentPatcher[ ._-]v?[0-9][A-Za-z0-9 ._+-]*\\.zip$",
+      "tagPrefix": "content-patcher/",
+      "automatic": true
+    }
+  ]
+}

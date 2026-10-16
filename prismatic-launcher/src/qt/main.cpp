@@ -8,6 +8,7 @@
 #include <QMessageBox>
 
 #include "AtomicFile.h"
+#include "DataPaths.h"
 #include "LauncherWindow.h"
 
 int main(int argc, char* argv[]) {
@@ -33,10 +34,16 @@ int main(int argc, char* argv[]) {
     const auto requestedData = parser.isSet("data-dir")
                                    ? parser.value("data-dir")
                                    : qEnvironmentVariable("PRISMATIC_DATA_DIR");
-    const auto dataDirectory =
-        QDir::cleanPath(requestedData.isEmpty() ? QApplication::applicationDirPath() + "/data"
-                                                : QFileInfo(requestedData).absoluteFilePath());
+    const auto dataDirectory = requestedData.isEmpty()
+                                   ? prismatic::defaultDataDirectory()
+                                   : QFileInfo(requestedData).absoluteFilePath();
     QString pathError;
+    if (requestedData.isEmpty() &&
+        !prismatic::migrateLegacyData(QApplication::applicationDirPath() + "/data", dataDirectory,
+                                      &pathError)) {
+        QMessageBox::critical(nullptr, "Cannot migrate launcher data", pathError);
+        return 1;
+    }
     if (!prismatic::validateStoragePath(dataDirectory, &pathError) ||
         !prismatic::validateStoragePath(dataDirectory + "/.launcher-session.lock", &pathError) ||
         !QDir().mkpath(dataDirectory) || !QFileInfo(dataDirectory).isWritable()) {

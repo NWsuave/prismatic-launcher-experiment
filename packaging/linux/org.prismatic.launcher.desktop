@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Prismatic Launcher
+Comment=Manage isolated Stardew Valley mod profiles
+Exec=prismatic-launch
+Icon=org.prismatic.launcher
+Terminal=false
+Categories=Game;
+Keywords=Stardew;Mods;SMAPI;
+StartupNotify=true
+StartupWMClass=prismatic-launch

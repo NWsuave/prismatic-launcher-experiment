@@ -1,0 +1,70 @@
+name: Package Linux AppImage
+
+on:
+  workflow_dispatch:
+    inputs:
+      appimagetool_url:
+        description: 'Trusted, version-pinned HTTPS appimagetool x86_64 URL'
+        required: true
+        type: string
+      appimagetool_sha256:
+        description: 'Independently verified SHA-256 for that tool'
+        required: true
+        type: string
+      runtime_url:
+        description: 'Trusted, version-pinned HTTPS AppImage x86_64 runtime URL'
+        required: true
+        type: string
+      runtime_sha256:
+        description: 'Independently verified SHA-256 for the runtime'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and packaging prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ qt6-base-dev qt6-base-dev-tools qt6-tools-dev-tools libarchive-dev python3 desktop-file-utils ripgrep file
+      - name: Test deployment validation
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 -m unittest discover -s packaging/linux -p 'test_*.py' -v
+      - name: Obtain explicitly selected deployment tool
+        env:
+          TOOL_URL: ${{ inputs.appimagetool_url }}
+          TOOL_SHA256: ${{ inputs.appimagetool_sha256 }}
+          RUNTIME_URL: ${{ inputs.runtime_url }}
+          RUNTIME_SHA256: ${{ inputs.runtime_sha256 }}
+        run: |
+          [[ "$TOOL_URL" == https://* && "$TOOL_SHA256" =~ ^[[:xdigit:]]{64}$ ]]
+          mkdir -p build/tools
+          curl --fail --location --proto '=https' --proto-redir '=https' --connect-timeout 20 --max-time 180 --max-filesize 104857600 "$TOOL_URL" -o build/tools/appimagetool
+          printf '%s  %s\n' "$TOOL_SHA256" build/tools/appimagetool | sha256sum --check --strict
+          chmod +x build/tools/appimagetool
+          [[ "$RUNTIME_URL" == https://* && "$RUNTIME_SHA256" =~ ^[[:xdigit:]]{64}$ ]]
+          curl --fail --location --proto '=https' --proto-redir '=https' --connect-timeout 20 --max-time 180 --max-filesize 10485760 "$RUNTIME_URL" -o build/tools/runtime-x86_64
+          printf '%s  %s\n' "$RUNTIME_SHA256" build/tools/runtime-x86_64 | sha256sum --check --strict
+      - name: Build, test, deploy, and validate
+        env:
+          APPIMAGETOOL: ${{ github.workspace }}/build/tools/appimagetool
+          APPIMAGETOOL_SHA256: ${{ inputs.appimagetool_sha256 }}
+          APPIMAGE_RUNTIME: ${{ github.workspace }}/build/tools/runtime-x86_64
+          APPIMAGE_RUNTIME_SHA256: ${{ inputs.runtime_sha256 }}
+        run: ./scripts/package-linux.sh
+      - name: Upload local packaging artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrismaticLauncher-linux-x86_64
+          path: |
+            build/artifacts/linux/*.AppImage
+            build/artifacts/linux/*.sha256
+            build/artifacts/linux/PrismaticLauncher.AppDir/usr/share/prismatic-launcher/
+          if-no-files-found: error

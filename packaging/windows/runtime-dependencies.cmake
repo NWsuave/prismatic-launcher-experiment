@@ -1,0 +1,77 @@
+cmake_minimum_required(VERSION 3.28)
+
+if(NOT WIN32)
+    message(FATAL_ERROR "Windows runtime deployment requires native Windows.")
+endif()
+if(NOT EXISTS "${PACKAGE_BIN}/prismatic-launch.exe")
+    message(FATAL_ERROR "PACKAGE_BIN must contain prismatic-launch.exe")
+endif()
+if(NOT MODE MATCHES "^(COPY|VERIFY)$")
+    message(FATAL_ERROR "MODE must be COPY or VERIFY")
+endif()
+
+# Explicitly select the native PE scanner; never interpret Windows binaries as ELF.
+set(CMAKE_GET_RUNTIME_DEPENDENCIES_PLATFORM windows+pe)
+set(CMAKE_GET_RUNTIME_DEPENDENCIES_TOOL dumpbin)
+find_program(CMAKE_GET_RUNTIME_DEPENDENCIES_COMMAND dumpbin REQUIRED)
+string(REPLACE "|" ";" search_directories "${SEARCH_DIRECTORIES}")
+file(GLOB_RECURSE package_dlls "${PACKAGE_BIN}/*.dll")
+file(GET_RUNTIME_DEPENDENCIES
+    EXECUTABLES "${PACKAGE_BIN}/prismatic-launch.exe"
+    LIBRARIES ${package_dlls}
+    DIRECTORIES "${PACKAGE_BIN}" ${search_directories}
+    RESOLVED_DEPENDENCIES_VAR resolved
+    UNRESOLVED_DEPENDENCIES_VAR unresolved
+    CONFLICTING_DEPENDENCIES_PREFIX conflicts
+    PRE_EXCLUDE_REGEXES "^[Aa][Pp][Ii]-[Mm][Ss]-" "^[Ee][Xx][Tt]-[Mm][Ss]-"
+)
+if(unresolved)
+    message(FATAL_ERROR "Unresolved Windows runtime dependencies: ${unresolved}")
+endif()
+foreach(name IN LISTS conflicts_FILENAMES)
+    set(previous_hash "")
+    foreach(path IN LISTS "conflicts_${name}")
+        file(SHA256 "${path}" hash)
+        if(previous_hash AND NOT hash STREQUAL previous_hash)
+            message(FATAL_ERROR "Conflicting runtime DLL ${name}: ${conflicts_${name}}")
+        endif()
+        set(previous_hash "${hash}")
+    endforeach()
+endforeach()
+
+file(TO_CMAKE_PATH "$ENV{SystemRoot}" system_root)
+string(TOLOWER "${system_root}/" system_prefix)
+file(REAL_PATH "${PACKAGE_BIN}" package_real)
+string(TOLOWER "${package_real}/" package_prefix)
+foreach(dependency IN LISTS resolved)
+    file(REAL_PATH "${dependency}" dependency_real)
+    string(TOLOWER "${dependency_real}" lower_dependency)
+    get_filename_component(name "${dependency}" NAME)
+    string(TOLOWER "${name}" lower_name)
+    # CRT DLLs must be app-local even if the build host already has them installed.
+    string(FIND "${lower_dependency}" "${system_prefix}" inside_system)
+    if(inside_system EQUAL 0 AND
+       NOT lower_name MATCHES "^(vcruntime|msvcp|concrt)")
+        continue()
+    endif()
+    string(FIND "${lower_dependency}" "${package_prefix}" inside_package)
+    if(inside_package EQUAL 0)
+        continue()
+    endif()
+    if(MODE STREQUAL "VERIFY")
+        message(FATAL_ERROR "Runtime dependency escapes package: ${dependency}")
+    endif()
+    if(lower_name MATCHES "^(vcruntime|msvcp|concrt)")
+        message(FATAL_ERROR "CRT ${name} was not deployed from the licensed Visual Studio Redist directory")
+    endif()
+    if(EXISTS "${PACKAGE_BIN}/${name}")
+        file(SHA256 "${dependency}" source_hash)
+        file(SHA256 "${PACKAGE_BIN}/${name}" target_hash)
+        if(NOT source_hash STREQUAL target_hash)
+            message(FATAL_ERROR "Refusing to replace a different deployed ${name}")
+        endif()
+    else()
+        file(COPY_FILE "${dependency}" "${PACKAGE_BIN}/${name}")
+    endif()
+endforeach()
+message(STATUS "Windows runtime dependency ${MODE} complete")

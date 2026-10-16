@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+app_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# Resolve plugins and libraries inside the bundle after any relocation.
+export PRISMATIC_ORIGINAL_LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}"
+export PRISMATIC_ORIGINAL_QT_PLUGIN_PATH="${QT_PLUGIN_PATH-}"
+export PRISMATIC_ORIGINAL_QT_QPA_PLATFORM_PLUGIN_PATH="${QT_QPA_PLATFORM_PLUGIN_PATH-}"
+export PRISMATIC_ORIGINAL_QML2_IMPORT_PATH="${QML2_IMPORT_PATH-}"
+export PRISMATIC_BUNDLED_ENV=1
+export LD_LIBRARY_PATH="$app_root/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export QT_PLUGIN_PATH="$app_root/usr/plugins"
+export QT_QPA_PLATFORM_PLUGIN_PATH="$app_root/usr/plugins/platforms"
+export QML2_IMPORT_PATH="$app_root/usr/qml"
+exec "$app_root/usr/bin/prismatic-launch" "$@"
