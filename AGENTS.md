@@ -18,7 +18,7 @@ Prismatic Launcher is a local C++20/Qt 6 Widgets desktop mod launcher. The user'
 - `prismatic-launcher/src/qt/` — canonical Qt UI and application entry point.
 - `tests/core/`, `tests/ui/` — fixture-based core and offscreen widget tests.
 - `.agents/skills/` — local skill instructions.
-- `packaging/` — native runtime deployment helpers, offline packaging-policy tests, desktop integration, and reviewed dependency catalog. Backend/API directories remain unimplemented. Historical alternate entry points and old SMAPI utilities remain unbuilt reference sources.
+- `packaging/` — native runtime deployment helpers, offline packaging-policy tests, desktop integration, and reviewed dependency catalog. Backend/API directories remain unimplemented. The obsolete prototype entry point/window and unbuilt SMAPI helper stack were removed; `prismatic-launcher/src/qt/main.cpp` is the canonical application entry point.
 
 ## Required reading and skill selection
 

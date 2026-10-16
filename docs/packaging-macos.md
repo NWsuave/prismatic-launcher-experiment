@@ -1,6 +1,6 @@
 # macOS development packaging
 
-The native packaging path creates a self-contained `Prismatic Launcher.app`, a compressed DMG with an Applications shortcut, an `.app.zip` for transporting the bundle with its symlinks intact, and SHA-256 checksums. It does not publish releases or contact mod hosts. The current Linux development environment cannot build or run these artifacts; native execution remains required before a macOS compatibility claim.
+The native packaging path creates a self-contained `Prismatic Launcher.app`, a compressed DMG with an Applications shortcut, an `.app.zip` for transporting the bundle with its symlinks intact, and SHA-256 checksums. It does not publish releases or contact mod hosts. A recorded Apple Silicon validation with Qt 6.12.0 produced these artifacts under `dist/macos-codex-validation/` and passed all 15 native tests, the dependency/signature audits and DMG/checksum validation. That bundle reports a minimum macOS version of 27.0.0 based on its dependencies. A Codex-hosted GUI attempt aborted during native application registration; normal Finder/Terminal GUI startup remains unverified in that record. The current Linux environment cannot repeat native macOS checks. See [PROGRESS.md](../PROGRESS.md) for the full evidence and limits.
 
 Install Xcode command line tools, CMake 3.28+, Ninja, Python 3.9+, a matching Qt 6 SDK, and libarchive. The Qt SDK must include Widgets, Concurrent, Network, Test, the Cocoa platform plugin and `macdeployqt`. For a Homebrew libarchive SDK and an installed Qt SDK:
 

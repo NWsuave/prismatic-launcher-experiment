@@ -89,7 +89,7 @@ jobs:
         id: source-check
         shell: bash
         run: |
-          if find prismatic-launcher/ui -type f \
+          if find src prismatic-launcher/src tests -type f \
             \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' \) \
             -print -quit 2>/dev/null | grep -q .; then
             echo "has_source=true" >> "$GITHUB_OUTPUT"

@@ -1,3 +1,159 @@
+# Conservative repository cleanup — current audit result
+
+Updated after audit, cleanup and verification: 2026-10-15. Baseline commit:
+`78917324cc15051b492d8877b05cd04c89439261`; working tree initially clean.
+All prior development reports, native packaging records and implementation history
+are preserved verbatim below this entry. Architecture decisions were not edited.
+No commit, push, publication or remote operation occurred.
+
+## Removed files and rationale
+
+Removed exactly **10 tracked prototype files, totaling 580 lines**:
+
+| File | Lines removed | Evidence/rationale |
+| --- | ---: | --- |
+| `prismatic-launcher/src/main.cpp` | 10 | Alternate entry point instantiating only the unused prototype MainWindow. |
+| `prismatic-launcher/src/qt/MainWindow.cpp` | 9 | Unbuilt designer-window implementation. |
+| `prismatic-launcher/src/qt/MainWindow.h` | 22 | Used only by the removed prototype entry point/window. |
+| `prismatic-launcher/src/qt/MainWindow.ui` | 31 | Empty designer form used only by that window. |
+| `prismatic-launcher/src/smapi/SmapiInstaller.cpp` | 170 | Unbuilt SMAPI installer; no active caller or shipped installation feature. |
+| `prismatic-launcher/src/smapi/SmapiInstaller.h` | 50 | Types consumed only by the unbuilt helper stack. |
+| `prismatic-launcher/src/smapi/SmapiLauncher.cpp` | 184 | Unbuilt fork-based launcher, superseded by active cross-platform GameLauncher. |
+| `prismatic-launcher/src/smapi/SmapiLauncher.h` | 10 | Consumed only by the unbuilt stack. |
+| `prismatic-launcher/src/smapi/SmapiManager.cpp` | 48 | Unbuilt wrapper without active consumers. |
+| `prismatic-launcher/src/smapi/SmapiManager.h` | 46 | Unbuilt wrapper/status types; no installed/exported header consumer. |
+
+Actual reference searches found only self-contained references within those legacy
+groups, plus historical documentation. Both explicit CMake source lists exclude
+them on every platform; the generated compilation database excludes all ten.
+The canonical `prismatic-launcher/src/qt/main.cpp`, LauncherWindow, GameLauncher,
+SMAPI detection/profile launching and native packaging paths remain intact.
+No active function, class, public interface, test or safety check was removed or
+consolidated. No product/UI behavior was refactored.
+
+## Configuration, dependencies and documentation
+
+- Fixed the obsolete CodeQL source-presence path in `.github/workflows/pr-checks.yml`:
+  nonexistent `prismatic-launcher/ui` became the actual `src`,
+  `prismatic-launcher/src` and `tests` trees. Previously the stale path made the
+  analysis job skip current sources. The exact guarded shell now returns true for
+  this repository and false for a disposable empty fixture. Workflow YAML parses;
+  no check or permission was weakened and no workflow was invoked remotely.
+- Added `dist` and both cached AppImage binary paths to `.dockerignore`, keeping
+  release outputs/tool caches out of the container context without deleting them.
+  Packaging utilities, tool manifests and policy tests remain available.
+- No dependency or CMake configuration was eliminated: all Qt components,
+  LibArchive, vcpkg manifests/baseline, presets, install rules and native packaging
+  targets remain justified and byte-identical. No tests were changed or weakened.
+- No generated binaries, packages, logs, bytecode or build/coverage output were
+  tracked by Git. Existing `.gitignore` patterns cover the observed generated
+  files; no broader ignores were introduced and `.gitignore` is unchanged.
+- Updated current README, agent guidance, infrastructure notes and macOS packaging
+  guide. They now reflect the sole entry point and the already-recorded native
+  Apple Silicon app/DMG validation, rather than claiming macOS packaging was never
+  built. The recorded GUI/sandbox and minimum-macOS limitations remain explicit.
+  Historical phase reports/ADRs were retained rather than rewritten.
+
+Full evidence and deferred-candidate details: [docs/cleanup-audit.md](docs/cleanup-audit.md).
+
+## Before/after tracked-source accounting
+
+Counts describe baseline-tracked paths present in the working tree; Git's index
+has not been staged or committed.
+
+| Measure | Before | After |
+| --- | ---: | ---: |
+| C++/header/designer-form files present | 52 | 42 |
+| Lines in those files | 9,024 | 8,444 |
+| Active compiled repository translation units | 29 | 29 |
+| Compiled QtTest executables | 14 | 14 |
+| Linux CTest entries, including packaging policy suites | 16 | 16 |
+| Existing test files/placeholder protected by hashes | 15 | 15 unchanged |
+| Modified retained C++/header files | 0 | 0 |
+| Modified CMake/preset/dependency files | 0 | 0 |
+| Tracked generated-output candidates | 0 | 0 |
+
+All **42 retained C++/header files are byte-identical to baseline HEAD**. Of 157
+baseline tracked files, 147 remain after the ten deletions; adding the new audit
+report would yield 148 repository files. No existing test was removed/merged.
+Five locally present release-package/checksum files were hashed before cleanup
+and verified unchanged afterwards. Existing build trees, packages, tool binaries
+and user data were not deleted. This host does not contain the earlier Mac's
+`dist/macos-codex-validation` artifacts; no command altered that release location.
+
+Machine-readable evidence: `build/cleanup-audit-before.json` and
+`build/cleanup-audit-after.json`. These records include removed-file identities,
+source counts, active translation units and preserved test/config/package hashes.
+
+## Actual verification results
+
+- Fresh Linux Debug baseline configure/build: passed with no compiler warnings or
+  errors. **16/16 CTest entries passed in 3.95 seconds** before removal.
+- Post-cleanup Debug build: passed; Ninja correctly reported no compilation work
+  because the deleted files never belonged to an active target. **16/16 CTest
+  entries passed in 3.55 seconds** without modifying tests.
+- Separate fresh Linux Release configure/build under `build/cleanup-release`:
+  passed with no compiler warnings or errors; **16/16 CTest entries passed in
+  3.37 seconds**. Both final test runs report 155 QtTest passes including
+  setup/cleanup, zero failures and one expected native-macOS-only skip. The two
+  remaining CTest entries execute 10 macOS and 12 Linux packaging-policy tests.
+- `./scripts/format-check.sh`: passed before cleanup and after cleanup with
+  clang-format 18.1.3; no formatting rules or tests were altered.
+- `./scripts/verify-infrastructure.sh`: passed.
+- `PRISMATIC_BUILD_DIR=build/cleanup-baseline ./scripts/static-analysis.sh`:
+  **passed, exit 0**, across the unchanged 29 active translation units. Strict
+  Cppcheck reported **zero diagnostics**. Clang-tidy emitted **1,611 advisory
+  warning lines** under the unchanged policy. Those advisories concern unchanged
+  active code and include existing style/complexity/Qt ownership/test suggestions;
+  this is not a warning-free analysis claim. No suppression or check was changed.
+- Exact CodeQL guard true/empty-fixture checks and workflow YAML parsing passed.
+  Native packaging shell syntax checks passed. `git diff --check` passed and the
+  final changed-file list was inspected.
+- Docker validation is unavailable: `docker info` returns permission denied for
+  `/var/run/docker.sock`. No image build/run was attempted; the existing image
+  bootstrap would also contact GitHub, outside this session's boundary.
+- gcovr, native macOS tooling and Windows/PowerShell are unavailable on this Linux
+  host. Coverage, native macOS/Windows packaging and real display/game execution
+  were not rerun. Their recorded prior evidence is preserved. All native packaging
+  source files and locally available release-package hashes remain unchanged.
+
+Logs/results: `build/cleanup-baseline-{configure,build,tests}.log`,
+`build/cleanup-after-{build,tests}.log`,
+`build/cleanup-release-{configure,build,tests}.log`,
+`build/cleanup-baseline/{baseline-results,cleanup-results}.xml`,
+`build/cleanup-release/cleanup-release-results.xml`,
+`build/cleanup-format-before.log`, and `build/cleanup-static-analysis.log`.
+
+## Deferred cleanup candidates and risks
+
+- `ModSourceCatalog::entries()` has no current in-tree caller, and
+  `DependencyDialog::busyChanged` has no current external receiver. Both remain
+  public interfaces; removal needs a separate API decision.
+- ModSourceProvider is an intentional future authorized-provider boundary. Keep it
+  even though the GUI currently uses GitHubReleaseProvider directly.
+- Existing style.qss is still loaded by bootstrap and tests. Theme consolidation
+  could affect appearance/startup and is deferred rather than altering behavior.
+- Preserve the canonical QCoreApplication CLI preflight, macOS bundle-plugin
+  setup, AtomicFile's named-save fallback, fresh-byte INI parser, download temp-root
+  canonicalization and SMAPI wrapper markers. They serve actual platform,
+  compatibility or security cases; tests/history explain why they exist.
+- Repeated fixture writers and reliability tests remain independent. Similar
+  syntax does not prove redundant assertions, and no test logic was consolidated.
+- Docker vcpkg setup and differences between native-build/packaging SDK workflows
+  need their own infrastructure/native verification before consolidation. No
+  dependency provisioning path was removed in this audit.
+- Ignored scratch harnesses, earlier builds, packages, historical infrastructure
+  plans, ADRs, agent skills and GitHub templates remain untouched. Generated
+  artifacts under build/dist are protected user assets, not deletion candidates.
+
+No cleanup regression or unresolved blocking issue was found by the available
+checks. Remaining toolchain/sandbox limits are recorded above, not represented as
+new application failures.
+
+---
+
+# Preserved development reports and packaging history
+
 # macOS native package validation — GUI launch pending outside Codex
 
 Updated after native macOS packaging and non-GUI validation: 2026-10-15. The package was built on Apple Silicon with Qt 6.12.0. All **15/15 CTest entries passed**. `scripts/package-macos.sh` produced `dist/macos-codex-validation/Prismatic Launcher.app`, the versioned arm64 `.dmg`, `.app.zip`, and `SHA256SUMS`.

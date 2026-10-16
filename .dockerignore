@@ -2,12 +2,15 @@
 .agents
 build
 out
+dist
 coverage
 vcpkg_installed
 vcpkg/buildtrees
 vcpkg/packages
 vcpkg/downloads
 .cache
+tools/appimage/appimagetool-x86_64.AppImage
+tools/appimage/runtime-x86_64
 .env
 .env.*
 *.log
