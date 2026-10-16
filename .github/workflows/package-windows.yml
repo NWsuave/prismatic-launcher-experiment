@@ -23,7 +23,7 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Activate MSVC x64
         uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -36,7 +36,7 @@ jobs:
           arch: win64_msvc2022_64
           cache: true
       - name: Check out pinned vcpkg registry
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: microsoft/vcpkg
           ref: e0a6b8572cf0ac716fdc11466522cf744e97e0bd
