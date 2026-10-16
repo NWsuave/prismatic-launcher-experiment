@@ -302,12 +302,12 @@ int main(int argc, char** argv) {
     QCoreApplication application(argc, argv);
     if (application.arguments().value(1) == "--prismatic-fixture-child") {
         QFile output;
-        output.open(stdout, QIODevice::WriteOnly);
+        if (!output.open(stdout, QIODevice::WriteOnly)) return 2;
         output.write(QDir::currentPath().toUtf8() + '\n');
         output.write(application.arguments().value(2).toUtf8() + '\n');
         output.flush();
         QFile errors;
-        errors.open(stderr, QIODevice::WriteOnly);
+        if (!errors.open(stderr, QIODevice::WriteOnly)) return 3;
         errors.write("fixture stderr\n");
         errors.flush();
         QThread::msleep(150);

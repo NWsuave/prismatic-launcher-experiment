@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QSet>
 #include <QWidget>
 #include <functional>
 
@@ -13,6 +14,7 @@ class QPlainTextEdit;
 class QPushButton;
 class QTableWidget;
 class QTimer;
+class QFutureWatcherBase;
 
 class ModExplorerPage : public QWidget {
     Q_OBJECT
@@ -62,4 +64,6 @@ class ModExplorerPage : public QWidget {
     QPushButton* refresh_ = nullptr;
     QFileSystemWatcher* watcher_ = nullptr;
     QTimer* refreshTimer_ = nullptr;
+    QTimer* inventoryCheckTimer_ = nullptr;
+    QSet<QFutureWatcherBase*> activeWorkers_;
 };

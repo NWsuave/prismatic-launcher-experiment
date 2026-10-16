@@ -1,3 +1,14 @@
+# macOS native package validation — GUI launch pending outside Codex
+
+Updated after native macOS packaging and non-GUI validation: 2026-10-15. The package was built on Apple Silicon with Qt 6.12.0. All **15/15 CTest entries passed**. `scripts/package-macos.sh` produced `dist/macos-codex-validation/Prismatic Launcher.app`, the versioned arm64 `.dmg`, `.app.zip`, and `SHA256SUMS`.
+
+- The main executable and Cocoa platform plug-in are thin arm64 Mach-O binaries. The deployer audited **45 Mach-O files**, resolved all non-system imports from bundled dependencies, and reported zero additional dependencies needed after deployment. The main executable links Qt through `@loader_path/../Frameworks`; the Cocoa plug-in is present under `Contents/PlugIns/platforms`.
+- `codesign --verify --deep --strict`, Info.plist validation, the deployment audit, packaged `--help`, ZIP integrity, both artifact checksums, and `hdiutil verify` all passed. The bundle is ad-hoc signed and not notarized. `LSMinimumSystemVersion` is **27.0.0**, determined from the bundled binaries; compatibility on older macOS versions is not established.
+- The Codex-hosted GUI launch is **not a valid application failure result**: the reported SIGABRT occurs in HIServices `_RegisterApplication` during `NSApplication` initialization with Codex as parent, matching the reported Codex macOS sandbox issue (openai/codex#30043). The bundle's Qt frameworks and Cocoa plug-in were loaded before that abort. No application or packaging change was made to work around this host-specific GUI failure. Finder/normal-Terminal GUI startup and isolated-data behavior remain pending the user's manual launch outside Codex.
+- The ordinary macOS native application GUI is not launched by the test suites. No real Stardew Valley installation or saves were accessed.
+
+All source changes and generated artifacts remain local and uncommitted. This validation does not establish Gatekeeper/notarization behavior, GUI startup outside the Codex sandbox, or compatibility below macOS 27.0.0.
+
 # Linux AppImage completed — Phase 2 follow-up
 
 Updated after actual artifact generation and validation: 2026-10-15. This addendum supersedes the earlier Linux AppImage tooling/artifact limitation. Every byte of the previous Phase 2 report and earlier implementation history is preserved below it. macOS/Windows limitations remain unchanged.

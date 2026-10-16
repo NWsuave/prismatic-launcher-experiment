@@ -71,6 +71,29 @@ Load command 2
             deploy.update_minimum_os(self.bundle)
         self.assertEqual(plistlib.loads(info.read_bytes())["LSMinimumSystemVersion"], "14.0.0")
 
+    def test_bundle_updates_read_only_info_plist_and_preserves_mode(self):
+        info = self.bundle / "Contents/Info.plist"
+        info.write_bytes(plistlib.dumps({"LSMinimumSystemVersion": "12.0"}))
+        info.chmod(0o444)
+        self.binary(self.frameworks / "libarchive.dylib")
+        minima = lambda binary: (14, 0, 0) if binary.name == "libarchive.dylib" else (12, 0, 0)
+        with patch.object(deploy, "minimum_macos_version", side_effect=minima), contextlib.redirect_stdout(io.StringIO()):
+            deploy.update_minimum_os(self.bundle)
+        self.assertEqual(plistlib.loads(info.read_bytes())["LSMinimumSystemVersion"], "14.0.0")
+        self.assertEqual(info.stat().st_mode & 0o777, 0o444)
+
+    def test_signs_nested_code_before_the_app_bundle(self):
+        executable = self.bundle / "Contents/MacOS/prismatic-launch"
+        plugin = self.binary(self.bundle / "Contents/PlugIns/imageformats/libqjpeg.dylib")
+        commands = []
+        with patch.object(deploy, "macho_files", return_value=[executable, plugin]), patch.object(
+            deploy.subprocess, "run", return_value=type("Result", (), {"returncode": 1})()
+        ), patch.object(deploy, "run", side_effect=lambda *args: commands.append(args) or ""):
+            deploy.sign(self.bundle, "adhoc")
+        self.assertEqual(commands[0][-1], str(plugin))
+        self.assertEqual(commands[-1][-1], str(self.bundle))
+        self.assertNotIn(str(executable), [command[-1] for command in commands])
+
     def test_escaping_bundle_symlink_is_rejected(self):
         (self.frameworks / "escape").symlink_to(self.root)
         with self.assertRaisesRegex(RuntimeError, "escapes app"):

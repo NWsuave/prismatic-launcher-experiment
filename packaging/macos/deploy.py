@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import plistlib
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -21,7 +22,12 @@ MACHO_MAGIC = {
 
 
 def run(*args):
-    return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT)
+    try:
+        return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as error:
+        detail = (error.output or "").strip()
+        command = " ".join(str(argument) for argument in args)
+        raise RuntimeError(f"Command {command!r} failed: {detail}") from error
 
 
 def system_path(path):
@@ -106,6 +112,7 @@ def copy_dependency(source, framework_dir):
 
 
 def deploy(bundle):
+    bundle = bundle.resolve(strict=True)
     # Reject pre-existing escapes before any mkdir, chmod, copy, or path rewrite.
     validate_symlinks(bundle)
     executable = bundle / "Contents/MacOS/prismatic-launch"
@@ -159,6 +166,7 @@ def deploy(bundle):
 
 
 def audit(bundle):
+    bundle = bundle.resolve(strict=True)
     validate_symlinks(bundle)
     executable = bundle / "Contents/MacOS/prismatic-launch"
     if not executable.is_file():
@@ -180,7 +188,11 @@ def audit(bundle):
 
 
 def sign(bundle, mode):
-    binaries = list(macho_files(bundle))
+    executable = bundle / "Contents/MacOS/prismatic-launch"
+    # Signing the main executable path can make codesign inspect its enclosing
+    # app bundle. Sign nested code first, then let the final bundle signature
+    # sign the main executable after all plug-ins and frameworks are complete.
+    binaries = [binary for binary in macho_files(bundle) if binary != executable]
     for binary in binaries:
         signed = subprocess.run(["codesign", "-dv", str(binary)], capture_output=True).returncode == 0
         if signed:
@@ -225,8 +237,13 @@ def update_minimum_os(bundle):
     with info_path.open("rb") as stream:
         info = plistlib.load(stream)
     info["LSMinimumSystemVersion"] = version
-    with info_path.open("wb") as stream:
-        plistlib.dump(info, stream)
+    original_mode = stat.S_IMODE(info_path.stat().st_mode)
+    try:
+        info_path.chmod(original_mode | stat.S_IWUSR)
+        with info_path.open("wb") as stream:
+            plistlib.dump(info, stream)
+    finally:
+        info_path.chmod(original_mode)
     print(f"Bundled Mach-O minimum macOS version: {version}; clean-host compatibility still requires testing.")
 
 

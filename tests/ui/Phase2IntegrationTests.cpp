@@ -175,9 +175,15 @@ class Phase2IntegrationTests : public QObject {
         QString warningText;
         QTimer::singleShot(0, &window, [&] {
             if (auto* box = qobject_cast<QMessageBox*>(QApplication::activeModalWidget())) {
-                warningShown = box->windowTitle() == "Unresolved profile dependencies";
                 warningText = box->text();
-                box->button(QMessageBox::Cancel)->click();
+                const bool isDependencyWarning =
+                    warningText.contains("unresolved required dependencies", Qt::CaseInsensitive) &&
+                    warningText.contains("Fixture.Missing") && warningText.contains("2.0.0") &&
+                    (box->standardButtons() & QMessageBox::Cancel);
+                if (isDependencyWarning) {
+                    warningShown = true;
+                    box->button(QMessageBox::Cancel)->click();
+                }
             }
         });
         toggle->click();

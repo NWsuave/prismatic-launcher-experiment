@@ -103,6 +103,12 @@ ModExplorerPage::ModExplorerPage(QString dataRoot, QWidget* parent, bool autoRef
     refreshTimer_ = new QTimer(this);
     refreshTimer_->setSingleShot(true);
     refreshTimer_->setInterval(150);
+    inventoryCheckTimer_ = new QTimer(this);
+    inventoryCheckTimer_->setInterval(2000);
+    connect(inventoryCheckTimer_, &QTimer::timeout, this, [this] {
+        if (isVisible() && !busy_ && mutationAllowed_) refresh();
+    });
+    inventoryCheckTimer_->start();
     const auto schedule = [this] { refreshTimer_->start(); };
     connect(watcher_, &QFileSystemWatcher::directoryChanged, this, schedule);
     connect(watcher_, &QFileSystemWatcher::fileChanged, this, schedule);
@@ -134,9 +140,7 @@ ModExplorerPage::ModExplorerPage(QString dataRoot, QWidget* parent, bool autoRef
 
 ModExplorerPage::~ModExplorerPage() {
     // Workers only capture values. Await them before allowing parent data teardown.
-    for (auto* watcher : findChildren<QFutureWatcher<prismatic::ModInventorySnapshot>*>())
-        watcher->waitForFinished();
-    for (auto* watcher : findChildren<QFutureWatcher<QString>*>()) watcher->waitForFinished();
+    for (auto* watcher : activeWorkers_) watcher->waitForFinished();
 }
 
 void ModExplorerPage::setMutationAllowed(bool allowed) {
@@ -164,8 +168,10 @@ void ModExplorerPage::refresh() {
     setBusy(true);
     status_->setText(tr("Reading installed mods across profiles…"));
     auto* watcher = new QFutureWatcher<prismatic::ModInventorySnapshot>(this);
+    activeWorkers_.insert(watcher);
     connect(watcher, &QFutureWatcher<prismatic::ModInventorySnapshot>::finished, this,
             [this, watcher] {
+                activeWorkers_.remove(watcher);
                 snapshot_ = watcher->result();
                 watcher->deleteLater();
                 renderMods();
@@ -308,7 +314,9 @@ void ModExplorerPage::changeSelected(bool remove) {
     status_->setText(remove ? tr("Removing selected profile installation…")
                             : tr("Updating selected profile installation…"));
     auto* watcher = new QFutureWatcher<QString>(this);
+    activeWorkers_.insert(watcher);
     connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher] {
+        activeWorkers_.remove(watcher);
         const QString error = watcher->result();
         watcher->deleteLater();
         setBusy(false);

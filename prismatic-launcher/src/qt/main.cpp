@@ -7,11 +7,45 @@
 #include <QLockFile>
 #include <QMessageBox>
 
+namespace {
+#ifdef Q_OS_MACOS
+void useBundledQtPlugins(char* argv[]) {
+    const auto executable = QFileInfo(QString::fromLocal8Bit(argv[0])).absoluteFilePath();
+    QDir contents(QFileInfo(executable).absolutePath());
+    if (contents.dirName() != "MacOS" || !contents.cdUp() || contents.dirName() != "Contents")
+        return;
+    const auto plugins = contents.filePath("PlugIns");
+    if (QFileInfo::exists(plugins + "/platforms/libqcocoa.dylib"))
+        qputenv("QT_PLUGIN_PATH", QFile::encodeName(plugins));
+}
+#endif
+
+void configureParser(QCommandLineParser& parser) {
+    parser.setApplicationDescription("Prismatic Launcher — local Stardew Valley mod profiles");
+    parser.addHelpOption();
+    parser.addVersionOption();
+    parser.addOption({"config", "Use an alternate INI configuration file.", "file"});
+    parser.addOption(
+        {"data-dir", "Store launcher profiles and settings in this directory.", "directory"});
+}
+}  // namespace
+
 #include "AtomicFile.h"
 #include "DataPaths.h"
 #include "LauncherWindow.h"
 
 int main(int argc, char* argv[]) {
+    {
+        QCoreApplication commandLineApp(argc, argv);
+        QCoreApplication::setApplicationName("Prismatic Launcher");
+        QCoreApplication::setApplicationVersion("0.2.0");
+        QCommandLineParser commandLineParser;
+        configureParser(commandLineParser);
+        commandLineParser.process(commandLineApp);
+    }
+#ifdef Q_OS_MACOS
+    useBundledQtPlugins(argv);
+#endif
     QApplication app(argc, argv);
     QApplication::setApplicationName("Prismatic Launcher");
     QApplication::setOrganizationName("Prismatic");
@@ -19,13 +53,8 @@ int main(int argc, char* argv[]) {
     QApplication::setFont(QFont("Sans Serif", 10));
 
     QCommandLineParser parser;
-    parser.setApplicationDescription("Prismatic Launcher — local Stardew Valley mod profiles");
-    parser.addHelpOption();
-    parser.addVersionOption();
+    configureParser(parser);
     QApplication::setApplicationVersion("0.2.0");
-    parser.addOption({"config", "Use an alternate INI configuration file.", "file"});
-    parser.addOption(
-        {"data-dir", "Store launcher profiles and settings in this directory.", "directory"});
     parser.process(app);
 
     QFile stylesheet(":/ui/style.qss");
